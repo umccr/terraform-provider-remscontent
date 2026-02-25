@@ -20,6 +20,7 @@ import (
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &FormResource{}
 var _ resource.ResourceWithImportState = &FormResource{}
+var _ resource.ResourceWithConfigure = &FormResource{}
 
 func NewFormResource() resource.Resource {
 	return &FormResource{}
@@ -31,7 +32,7 @@ func (r *FormResource) Metadata(ctx context.Context, req resource.MetadataReques
 
 // FormResource defines the resource implementation.
 type FormResource struct {
-	client *remsclient.APIClient
+	BaseRemsResource
 }
 
 /*
@@ -151,11 +152,11 @@ func (r *FormResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 				},
 			},
 			"organization_id": schema.StringAttribute{
-				MarkdownDescription: "Example configurable attribute",
+				MarkdownDescription: "The ID of the organization to associate this license with.",
 				Required:            true,
 			},
 			"title": schema.StringAttribute{
-				MarkdownDescription: "Example configurable attribute",
+				MarkdownDescription: "Form title attribute",
 				Required:            true,
 			},
 			"fields": schema.ListNestedAttribute{
@@ -166,34 +167,20 @@ func (r *FormResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 	}
 }
 
-func (r *FormResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	// Prevent panic if the provider has not been configured.
-	if req.ProviderData == nil {
-		return
-	}
-
-	client, ok := req.ProviderData.(*remsclient.APIClient)
-
-	if !ok {
-		resp.Diagnostics.AddError(
-			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected *remsclient.APIClient, got: %T. Please report this issue to the provider developers.", req.ProviderData),
-		)
-
-		return
-	}
-
-	r.client = client
-}
-
 func (r *FormResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var resourceModel FormResourceModel
+	var plan FormResourceModel
 
 	// Read Terraform plan data into the model
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &resourceModel)...)
-
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	formCreateCommand := remsclient.CreateFormCommand{
+		Organization: remsclient.OrganizationId{
+			OrganizationId: plan.OrganizationId.ValueString(),
+		},
+		FormTitle: plan.Title.ValueString(),
 	}
 
 	// Convert our resource model map with error checking
@@ -282,7 +269,6 @@ func (r *FormResource) Create(ctx context.Context, req resource.CreateRequest, r
 
 func (r *FormResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var data FormResourceModel
-
 	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 

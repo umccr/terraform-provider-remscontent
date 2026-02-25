@@ -5,17 +5,20 @@ package data_sources
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-	"github.com/umccr/terraform-provider-remscontent/internal/remsclient"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
-var _ datasource.DataSource = &OrganizationDataSource{}
+var (
+	_ datasource.DataSource              = &OrganizationDataSource{}
+	_ datasource.DataSourceWithConfigure = &OrganizationDataSource{}
+)
 
 func NewOrganizationDataSource() datasource.DataSource {
 	return &OrganizationDataSource{}
@@ -23,13 +26,12 @@ func NewOrganizationDataSource() datasource.DataSource {
 
 // OrganizationDataSource defines the data source implementation.
 type OrganizationDataSource struct {
-	client *remsclient.APIClient
+	BaseRemsDataSource
 }
 
 // OrganizationDataSourceModel describes the data source data model.
 type OrganizationDataSourceModel struct {
-	ConfigurableAttribute types.String `tfsdk:"configurable_attribute"`
-	Id                    types.String `tfsdk:"id"`
+	Id types.String `tfsdk:"id"`
 }
 
 func (d *OrganizationDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -41,36 +43,12 @@ func (d *OrganizationDataSource) Schema(ctx context.Context, req datasource.Sche
 		MarkdownDescription: "Organization data source",
 
 		Attributes: map[string]schema.Attribute{
-			"configurable_attribute": schema.StringAttribute{
-				MarkdownDescription: "Example configurable attribute",
-				Optional:            true,
-			},
 			"id": schema.StringAttribute{
-				MarkdownDescription: "Example identifier",
-				Computed:            true,
+				MarkdownDescription: "Organization id / Title",
+				Required:            true,
 			},
 		},
 	}
-}
-
-func (d *OrganizationDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	// Prevent panic if the provider has not been configured.
-	if req.ProviderData == nil {
-		return
-	}
-
-	client, ok := req.ProviderData.(*remsclient.APIClient)
-
-	if !ok {
-		resp.Diagnostics.AddError(
-			"Unexpected Data Source Configure Type",
-			fmt.Sprintf("Expected *openapi.APIClient, got: %T. Please report this issue to the provider developers.", req.ProviderData),
-		)
-
-		return
-	}
-
-	d.client = client
 }
 
 func (d *OrganizationDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -78,32 +56,27 @@ func (d *OrganizationDataSource) Read(ctx context.Context, req datasource.ReadRe
 
 	// Read Terraform configuration data into the model
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	orgsResult, _, orgsErr := d.client.OrganizationsAPI.
-		ApiOrganizationsGet(context.Background()).
+	orgsResult, _, err := d.client.OrganizationsAPI.
+		ApiOrganizationsOrganizationIdGet(ctx, data.Id.ValueString()).
 		Execute()
 
-	if orgsErr != nil {
-		resp.Diagnostics.AddError("Getting JSON response from REMS Organization API", orgsErr.Error())
+	if err != nil {
+		resp.Diagnostics.AddError("Error reading organization", err.Error())
 		return
 	}
 
-	for _, u := range orgsResult {
-		tflog.Trace(ctx, u.OrganizationId)
-	}
+	jsonBytes, err := json.MarshalIndent(orgsResult, "", "  ")
+	tflog.Info(ctx, fmt.Sprintf("OUTPUT - orgsResult:\n%s", string(jsonBytes)))
 
-	// For the purposes of this example code, hardcoding a response value to
-	// save into the Terraform state.
-	data.Id = types.StringValue("example-id")
+	// // 3. Map API response → Model
+	// data.Name = types.StringValue(*orgResult.OrganizationId.OrganizationId)
+	// data.Archived = types.BoolValue(*orgResult.Archived)
+	// data.Enabled = types.BoolValue(*orgResult.Enabled)
 
-	// Write logs using the tflog package
-	// Documentation: https://terraform.io/plugin/log
-	tflog.Trace(ctx, "read a data source")
-
-	// Save data into Terraform state
+	// 4. Save to Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
