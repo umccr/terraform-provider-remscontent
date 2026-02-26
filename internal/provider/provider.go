@@ -184,6 +184,7 @@ func (p *RemsContentProvider) Configure(ctx context.Context, req provider.Config
 func (p *RemsContentProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		resources.NewLicenseResource,
+		resources.NewFormResource,
 	}
 }
 

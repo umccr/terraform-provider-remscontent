@@ -13,7 +13,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/umccr/terraform-provider-remscontent/internal/remsclient"
 )
 
@@ -161,7 +160,7 @@ func (r *FormResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 			},
 			"fields": schema.ListNestedAttribute{
 				NestedObject: fieldSchema,
-				Required:     true,
+				Optional:     true,
 			},
 		},
 	}
@@ -176,95 +175,124 @@ func (r *FormResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
+	formTitle := plan.Title.ValueString()
+
 	formCreateCommand := remsclient.CreateFormCommand{
 		Organization: remsclient.OrganizationId{
 			OrganizationId: plan.OrganizationId.ValueString(),
 		},
-		FormTitle: plan.Title.ValueString(),
+		FormInternalName: &formTitle,
+		FormExternalTitle: &map[string]string{
+			"en": formTitle,
+		},
 	}
 
-	// Convert our resource model map with error checking
-	modelFields := make([]FormFieldResourceModel, len(resourceModel.Fields.Elements()))
-	modelFieldDiagnostics := resourceModel.Fields.ElementsAs(ctx, &modelFields, false)
-
-	if len(modelFieldDiagnostics) > 0 {
-		resp.Diagnostics.Append(modelFieldDiagnostics...)
-	}
-
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	// construct the API input models in reverse order (the generated openapi Go client is a bit wierd)
-	orgId := remsclient.NewOrganizationId(resourceModel.OrganizationId.ValueString())
-
-	formConfig := remsclient.NewCreateFormCommandWithDefaults()
-	formConfig.SetOrganization(*orgId)
-
-	// convert resource model data into API model
-	if resourceModel.Title.IsNull() {
-		formConfig.SetFormTitleNil()
-	} else {
-		formConfig.SetFormTitle(resourceModel.Title.ValueString())
-	}
-
-	newFields := make([]remsclient.NewwFieldTemplate, 0)
-
-	for _, modelFieldValue := range modelFields {
-
-		if !modelFieldValue.Title.IsNull() && !modelFieldValue.Title.IsUnknown() {
-			var titleMap map[string]string
-			resp.Diagnostics.Append(modelFieldValue.Title.ElementsAs(ctx, &titleMap, false)...)
-			if resp.Diagnostics.HasError() {
-				return
-			}
-
-			newField := remsclient.NewNewFieldTemplate(
-				titleMap,
-				modelFieldValue.Type.ValueString(),
-				modelFieldValue.Optional.ValueBool())
-
-			if !modelFieldValue.Id.IsNull() {
-				newField.SetFieldId(modelFieldValue.Id.ValueString())
-			}
-
-			newFields = append(newFields, *newField)
-		}
-	}
-
-	formConfig.SetFormFields(newFields)
-
-	createResult, createResponse, createErr := r.client.FormsAPI.
-		ApiFormsCreatePost(context.Background()).
-		CreateFormCommand(*formConfig).
+	formResult, _, err := r.client.FormsAPI.
+		ApiFormsCreatePost(ctx).
+		CreateFormCommand(formCreateCommand).
 		Execute()
 
-	if createErr != nil {
+	if err != nil || formResult.Id == nil {
+
+		var errorDetail string
+		if err != nil {
+			errorDetail = fmt.Sprintf("Unable to create form: %s", err)
+		} else {
+			errorDetail = "API returned a nil ID for the created license."
+		}
+
 		resp.Diagnostics.AddError(
-			"Failure to create form",
-			fmt.Sprintf("Could not create form: %s %v", createErr.Error(), createResponse),
+			"Error Creating Form",
+			errorDetail,
 		)
 		return
 	}
 
-	if !createResult.Success {
-		resp.Diagnostics.AddError(
-			"Failure to create form",
-			fmt.Sprintf("Could not create form: %v", createResult.GetErrors()),
-		)
-		return
-	}
+	plan.Id = types.Int64Value(*formResult.Id)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 
-	tflog.Info(ctx, createResponse.Status)
+	// // Convert our resource model map with error checking
+	// modelFields := make([]FormFieldResourceModel, len(resourceModel.Fields.Elements()))
+	// modelFieldDiagnostics := resourceModel.Fields.ElementsAs(ctx, &modelFields, false)
 
-	resourceModel.Id = types.Int64Value(createResult.GetId())
+	// if len(modelFieldDiagnostics) > 0 {
+	// 	resp.Diagnostics.Append(modelFieldDiagnostics...)
+	// }
 
-	// Write logs using the tflog package
-	// Documentation: https://terraform.io/plugin/log
-	tflog.Trace(ctx, "created a resource")
+	// if resp.Diagnostics.HasError() {
+	// 	return
+	// }
 
-	// Save resourceModel into Terraform state
-	resp.Diagnostics.Append(resp.State.Set(ctx, &resourceModel)...)
+	// // construct the API input models in reverse order (the generated openapi Go client is a bit wierd)
+	// orgId := remsclient.NewOrganizationId(resourceModel.OrganizationId.ValueString())
+
+	// formConfig := remsclient.NewCreateFormCommandWithDefaults()
+	// formConfig.SetOrganization(*orgId)
+
+	// // convert resource model data into API model
+	// if resourceModel.Title.IsNull() {
+	// 	formConfig.SetFormTitleNil()
+	// } else {
+	// 	formConfig.SetFormTitle(resourceModel.Title.ValueString())
+	// }
+
+	// newFields := make([]remsclient.NewwFieldTemplate, 0)
+
+	// for _, modelFieldValue := range modelFields {
+
+	// 	if !modelFieldValue.Title.IsNull() && !modelFieldValue.Title.IsUnknown() {
+	// 		var titleMap map[string]string
+	// 		resp.Diagnostics.Append(modelFieldValue.Title.ElementsAs(ctx, &titleMap, false)...)
+	// 		if resp.Diagnostics.HasError() {
+	// 			return
+	// 		}
+
+	// 		newField := remsclient.NewNewFieldTemplate(
+	// 			titleMap,
+	// 			modelFieldValue.Type.ValueString(),
+	// 			modelFieldValue.Optional.ValueBool())
+
+	// 		if !modelFieldValue.Id.IsNull() {
+	// 			newField.SetFieldId(modelFieldValue.Id.ValueString())
+	// 		}
+
+	// 		newFields = append(newFields, *newField)
+	// 	}
+	// }
+
+	// formConfig.SetFormFields(newFields)
+
+	// createResult, createResponse, createErr := r.client.FormsAPI.
+	// 	ApiFormsCreatePost(context.Background()).
+	// 	CreateFormCommand(*formConfig).
+	// 	Execute()
+
+	// if createErr != nil {
+	// 	resp.Diagnostics.AddError(
+	// 		"Failure to create form",
+	// 		fmt.Sprintf("Could not create form: %s %v", createErr.Error(), createResponse),
+	// 	)
+	// 	return
+	// }
+
+	// if !createResult.Success {
+	// 	resp.Diagnostics.AddError(
+	// 		"Failure to create form",
+	// 		fmt.Sprintf("Could not create form: %v", createResult.GetErrors()),
+	// 	)
+	// 	return
+	// }
+
+	// tflog.Info(ctx, createResponse.Status)
+
+	// resourceModel.Id = types.Int64Value(createResult.GetId())
+
+	// // Write logs using the tflog package
+	// // Documentation: https://terraform.io/plugin/log
+	// tflog.Trace(ctx, "created a resource")
+
+	// // Save resourceModel into Terraform state
+	// resp.Diagnostics.Append(resp.State.Set(ctx, &resourceModel)...)
 }
 
 func (r *FormResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
