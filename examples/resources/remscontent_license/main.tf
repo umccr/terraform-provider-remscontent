@@ -29,6 +29,5 @@ resource "remscontent_license" "example_attachment_license" {
   path            = "./license-en.txt"
 }
 
-# output "edu_coffees" {
-#   value = remscontent_license.example_license.id
-# }
+
+

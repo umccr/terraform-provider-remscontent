@@ -26,7 +26,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-	remsclient "github.com/umccr/terraform-provider-remscontent/internal/remsclient"
+	remsclient "github.com/umccr/terraform-provider-remscontent/internal/rems-client"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -149,10 +149,12 @@ func (r *LicenseResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
+	licensetype := remsclient.CreateLicenseCommandLicensetype(plan.Type.ValueString())
+
 	licenseCommand := remsclient.CreateLicenseCommand{
-		Licensetype: plan.Type.ValueString(),
-		Organization: remsclient.OrganizationId{
-			OrganizationId: plan.OrganizationId.ValueString(),
+		Licensetype: licensetype,
+		Organization: remsclient.OrganizationID{
+			OrganizationID: plan.OrganizationId.ValueString(),
 		},
 		Localizations: map[string]remsclient.LicenseLocalization{
 			"en": {
@@ -176,7 +178,7 @@ func (r *LicenseResource) Create(ctx context.Context, req resource.CreateRequest
 		}
 
 		enLoc := licenseCommand.Localizations["en"]
-		enLoc.AttachmentId = *remsclient.NewNullableInt64(&attachment_id)
+		enLoc.AttachmentID = &attachment_id
 		enLoc.Textcontent = filepath.Base(filePath)
 		licenseCommand.Localizations["en"] = enLoc
 
@@ -185,10 +187,11 @@ func (r *LicenseResource) Create(ctx context.Context, req resource.CreateRequest
 
 	}
 
-	licenseResult, _, err := r.client.LicensesAPI.
-		ApiLicensesCreatePost(ctx).
-		CreateLicenseCommand(licenseCommand).
-		Execute()
+	licenseResult, err := r.client.PostAPILicensesCreateWithResponse(
+		ctx,
+		nil,
+		remsclient.PostAPILicensesCreateJSONRequestBody(licenseCommand),
+	)
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -198,7 +201,7 @@ func (r *LicenseResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	if licenseResult.Id == nil {
+	if licenseResult.JSON200.ID == nil {
 		resp.Diagnostics.AddError(
 			"Error Creating License",
 			"API returned a nil ID for the created license.",
@@ -206,7 +209,7 @@ func (r *LicenseResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	plan.Id = types.Int64Value(*licenseResult.Id)
+	plan.Id = types.Int64Value(*licenseResult.JSON200.ID)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -218,21 +221,21 @@ func (r *LicenseResource) Read(ctx context.Context, req resource.ReadRequest, re
 		return
 	}
 
-	licenseResult, _, err := r.client.LicensesAPI.
-		ApiLicensesLicenseIdGet(ctx, state.Id.ValueInt64()).
-		Execute()
-
+	licenseResponse, err := r.client.GetAPILicensesLicenseIDWithResponse(ctx, state.Id.ValueInt64(), nil)
 	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading License",
-			fmt.Sprintf("Unable to read license %d: %s", state.Id.ValueInt64(), err),
-		)
+		resp.Diagnostics.AddError("Error", err.Error())
 		return
 	}
 
-	state.OrganizationId = types.StringValue(licenseResult.Organization.OrganizationId)
+	if licenseResponse.JSON200 == nil {
+		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Unexpected status: %s", licenseResponse.Status()))
+		return
+	}
 
-	state.Type = types.StringValue(licenseResult.Licensetype)
+	licenseResult := licenseResponse.JSON200
+
+	state.OrganizationId = types.StringValue(licenseResult.Organization.OrganizationID)
+	state.Type = types.StringValue(string(licenseResult.Licensetype))
 	state.Archived = types.BoolValue(licenseResult.Archived)
 	state.Enabled = types.BoolValue(licenseResult.Enabled)
 
@@ -256,10 +259,7 @@ func (r *LicenseResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	licenseResult, _, err := r.client.LicensesAPI.
-		ApiLicensesLicenseIdGet(ctx, plan.Id.ValueInt64()).
-		Execute()
-
+	licenseResponse, err := r.client.GetAPILicensesLicenseIDWithResponse(ctx, plan.Id.ValueInt64(), nil)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Reading License",
@@ -268,43 +268,46 @@ func (r *LicenseResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
+	licenseResult := licenseResponse.JSON200
+
 	// archiving api requests
 	if licenseResult.Archived != plan.Archived.ValueBool() {
 		licenseArchiveCommand := remsclient.ArchivedCommand{
-			Id:       plan.Id.ValueInt64(),
+			ID:       plan.Id.ValueInt64(),
 			Archived: plan.Archived.ValueBool(),
 		}
 
-		res, _, _ := r.client.LicensesAPI.ApiLicensesArchivedPut(ctx).ArchivedCommand(licenseArchiveCommand).Execute()
-		if res.Success == false {
+		archivedResponse, _ := r.client.PutAPILicensesArchivedWithResponse(ctx, nil, licenseArchiveCommand)
+
+		if archivedResponse.JSON200.Success == false {
 			resp.Diagnostics.AddError(
-				"Error Archiving License",
-				fmt.Sprintf("Unable to archive license id: %d", plan.Id.ValueInt64()),
+				"Error Archiving/Unarchiving License",
+				fmt.Sprintf("Unable to archive/unarchive license id: %d", plan.Id.ValueInt64()),
 			)
+			return
 		}
 	}
 
 	// disabled api request
 	if licenseResult.Enabled != plan.Enabled.ValueBool() {
 		licenseEnabledCommand := remsclient.EnabledCommand{
-			Id:      plan.Id.ValueInt64(),
+			ID:      plan.Id.ValueInt64(),
 			Enabled: plan.Enabled.ValueBool(),
 		}
 
-		res, _, _ := r.client.LicensesAPI.ApiLicensesEnabledPut(ctx).EnabledCommand(licenseEnabledCommand).Execute()
-		if res.Success == false {
+		enabledResponse, _ := r.client.PutAPILicensesEnabledWithResponse(ctx, nil, licenseEnabledCommand)
+		if enabledResponse.JSON200.Success == false {
 			resp.Diagnostics.AddError(
-				"Error Archiving License",
-				fmt.Sprintf("Unable to archive license id: %d", plan.Id.ValueInt64()),
+				"Error Enabled/Disabled License",
+				fmt.Sprintf("Unable to enabled/disabled license id: %d", plan.Id.ValueInt64()),
 			)
+			return
 		}
 
 	}
 
-	// get latest record to update state
-	licenseResult, _, err = r.client.LicensesAPI.
-		ApiLicensesLicenseIdGet(ctx, plan.Id.ValueInt64()).
-		Execute()
+	licenseResponse, _ = r.client.GetAPILicensesLicenseIDWithResponse(ctx, plan.Id.ValueInt64(), nil)
+	licenseResult = licenseResponse.JSON200
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -330,12 +333,12 @@ func (r *LicenseResource) Delete(ctx context.Context, req resource.DeleteRequest
 
 	// REMS does not support deletion - archive instead
 	licenseArchiveCommand := remsclient.ArchivedCommand{
-		Id:       state.Id.ValueInt64(),
+		ID:       state.Id.ValueInt64(),
 		Archived: true,
 	}
-	res, _, _ := r.client.LicensesAPI.ApiLicensesArchivedPut(ctx).ArchivedCommand(licenseArchiveCommand).Execute()
+	archivedResponse, _ := r.client.PutAPILicensesArchivedWithResponse(ctx, nil, licenseArchiveCommand)
 
-	if res.Success == false {
+	if archivedResponse.JSON200.Success == false {
 		resp.Diagnostics.AddError(
 			"Error Archiving License",
 			fmt.Sprintf("Unable to archive license id: %d", state.Id.ValueInt64()),
@@ -362,17 +365,12 @@ func (r *LicenseResource) ImportState(ctx context.Context, req resource.ImportSt
 }
 
 func (r *LicenseResource) uploadAttachment(ctx context.Context, filePath string) (int64, error) {
-	// OpenAPI tools for FormData has a bug
-	// https://github.com/OpenAPITools/openapi-generator/issues/16024
-
-	// Open and read the file
 	file, err := os.Open(filePath)
 	if err != nil {
 		return 0, fmt.Errorf("unable to open file: %s", err)
 	}
 	defer file.Close()
 
-	// Create multipart form data
 	var b bytes.Buffer
 	writer := multipart.NewWriter(&b)
 
@@ -381,49 +379,43 @@ func (r *LicenseResource) uploadAttachment(ctx context.Context, filePath string)
 		return 0, fmt.Errorf("unable to create form file: %s", err)
 	}
 
-	_, err = io.Copy(part, file)
-	if err != nil {
+	if _, err = io.Copy(part, file); err != nil {
 		return 0, fmt.Errorf("unable to copy file: %s", err)
 	}
 	writer.Close()
 
-	// Build the request
-	cfg := r.client.GetConfig()
-	url := "https://" + cfg.Host + "/api/licenses/add_attachment"
-
-	req, err := http.NewRequestWithContext(ctx, "POST", url, &b)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.client.ClientInterface.(*remsclient.Client).Server+"api/licenses/add_attachment", &b)
 	if err != nil {
 		return 0, fmt.Errorf("unable to create request: %s", err)
 	}
 
-	// Add auth headers if needed
-	for k, v := range cfg.DefaultHeader {
-		req.Header.Set(k, v)
+	underlyingClient := r.client.ClientInterface.(*remsclient.Client)
+	for _, editor := range underlyingClient.RequestEditors {
+		if err := editor(ctx, req); err != nil {
+			return 0, fmt.Errorf("unable to apply request editor: %s", err)
+		}
 	}
+
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
-	// Execute request
-	httpClient := &http.Client{}
-	resp, err := httpClient.Do(req)
+	httpResp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return 0, fmt.Errorf("unable to upload attachment: %s", err)
 	}
-	defer resp.Body.Close()
+	defer httpResp.Body.Close()
 
-	if resp.StatusCode >= 300 {
-		body, _ := io.ReadAll(resp.Body)
-		return 0, fmt.Errorf("upload failed with status %d: %s", resp.StatusCode, string(body))
+	if httpResp.StatusCode >= 300 {
+		body, _ := io.ReadAll(httpResp.Body)
+		return 0, fmt.Errorf("upload failed with status %d: %s", httpResp.StatusCode, string(body))
 	}
-
-	// Parse response
 	var result remsclient.AddLicenseAttachmentResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.NewDecoder(httpResp.Body).Decode(&result); err != nil {
 		return 0, fmt.Errorf("unable to decode response: %s", err)
 	}
 
-	if result.Success == false {
-		return 0, fmt.Errorf("attachment ID not returned")
+	if !result.Success {
+		return 0, fmt.Errorf("attachment upload was not successful")
 	}
 
-	return result.Id, nil
+	return result.ID, nil
 }

@@ -5,13 +5,15 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/umccr/terraform-provider-remscontent/internal/provider/data_sources"
 	"github.com/umccr/terraform-provider-remscontent/internal/provider/functions"
 	"github.com/umccr/terraform-provider-remscontent/internal/provider/resources"
-	remsclient "github.com/umccr/terraform-provider-remscontent/internal/remsclient"
+	remsclient "github.com/umccr/terraform-provider-remscontent/internal/rems-client"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/ephemeral"
@@ -34,6 +36,24 @@ type RemsContentProvider struct {
 	// provider is built and ran locally, and "test" when running acceptance
 	// testing.
 	version string
+}
+
+// contentTypeTransport strips charset from Content-Type headers
+// e.g. "application/json; charset=utf-8" -> "application/json"
+type contentTypeTransport struct {
+	wrapped http.RoundTripper
+}
+
+func (t *contentTypeTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := t.wrapped.RoundTrip(req)
+	if err != nil {
+		return nil, err
+	}
+	ct := resp.Header.Get("Content-Type")
+	if strings.Contains(ct, ";") {
+		resp.Header.Set("Content-Type", strings.TrimSpace(strings.Split(ct, ";")[0]))
+	}
+	return resp, nil
 }
 
 // RemsContentProviderModel describes the provider data model.
@@ -151,31 +171,28 @@ func (p *RemsContentProvider) Configure(ctx context.Context, req provider.Config
 		return
 	}
 
-	// configure a client to hit the authenticated endpoint
-	cfg := remsclient.NewConfiguration()
-	cfg.Host = endpoint
-	cfg.Scheme = "https"
-	cfg.DefaultHeader = map[string]string{
-		"x-rems-user-id": api_user,
-		"x-rems-api-key": api_key,
-		"Content-Type":   "application/json",
+	client, err := remsclient.NewClientWithResponses(
+		fmt.Sprintf("https://%s", endpoint),
+		remsclient.WithHTTPClient(&http.Client{
+			Transport: &contentTypeTransport{
+				wrapped: http.DefaultTransport,
+			},
+		}),
+		remsclient.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
+			req.Header.Set("x-rems-api-key", api_key)
+			req.Header.Set("x-rems-user-id", api_user)
+			req.Header.Set("Accept", "application/json")
+			req.Header.Set("Content-Type", "application/json")
+			return nil
+		}),
+	)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Unable to Create REMS API Client",
+			"An unexpected error occurred when creating the REMS API client: "+err.Error(),
+		)
+		return
 	}
-
-	//transport := &BasePathRoundTripper{
-	//	BasePath: "/api/",
-	//	Base:     http.DefaultTransport,
-	//}
-
-	//transport := &BasePathRoundTripper{
-	//	BasePath: "/api/",
-	//	Base:     &DebugRoundTripper{Base: http.DefaultTransport, Ctx: ctx},
-	//}
-
-	cfg.HTTPClient = &http.Client{
-		//	Transport: transport,
-	}
-
-	client := remsclient.NewAPIClient(cfg)
 
 	resp.DataSourceData = client
 	resp.ResourceData = client

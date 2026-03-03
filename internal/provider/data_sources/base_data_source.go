@@ -5,12 +5,12 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
-	remsclient "github.com/umccr/terraform-provider-remscontent/internal/remsclient"
+	remsclient "github.com/umccr/terraform-provider-remscontent/internal/rems-client"
 )
 
 // BaseRemsDataSource contains common fields and methods for all REMS data sources
 type BaseRemsDataSource struct {
-	client *remsclient.APIClient
+	client *remsclient.ClientWithResponses
 }
 
 // Configure sets up the API client (called by all data sources)
@@ -19,11 +19,11 @@ func (d *BaseRemsDataSource) Configure(ctx context.Context, req datasource.Confi
 		return
 	}
 
-	client, ok := req.ProviderData.(*remsclient.APIClient)
+	client, ok := req.ProviderData.(*remsclient.ClientWithResponses)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Data Source Configure Type",
-			fmt.Sprintf("Expected *remsclient.APIClient, got: %T", req.ProviderData),
+			fmt.Sprintf("Expected *remsclient.ClientWithResponses, got: %T", req.ProviderData),
 		)
 		return
 	}

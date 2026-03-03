@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	remsclient "github.com/umccr/terraform-provider-remscontent/internal/remsclient"
+	remsclient "github.com/umccr/terraform-provider-remscontent/internal/rems-client"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -64,17 +64,18 @@ func (d *LicenseDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		return
 	}
 
-	licenseResult, _, err := d.client.LicensesAPI.ApiLicensesGet(ctx).
-		Execute()
+	licenseResponse, err := d.client.GetAPILicensesWithResponse(ctx, nil)
+	licenseResult := *licenseResponse.JSON200
 
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading license", err.Error())
 		return
 	}
+
 	var matchedLicense *remsclient.License
 	for _, license := range licenseResult {
 		if enLocalizations, ok := license.Localizations["en"]; ok {
-			// Title might be a pointer - dereference it
+
 			if enLocalizations.Title == data.TitleEn.ValueString() {
 				if matchedLicense != nil {
 					resp.Diagnostics.AddError(
@@ -83,8 +84,7 @@ func (d *LicenseDataSource) Read(ctx context.Context, req datasource.ReadRequest
 					)
 					return
 				}
-				licenseCopy := license
-				matchedLicense = &licenseCopy
+				matchedLicense = &license
 			}
 		}
 	}
@@ -98,7 +98,7 @@ func (d *LicenseDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		return
 	}
 
-	data.Id = types.Int64Value(int64(matchedLicense.Id))
+	data.Id = types.Int64Value(int64(matchedLicense.ID))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

@@ -12,10 +12,40 @@ provider "remscontent" {
 
 
 resource "remscontent_form" "test_form" {
-  title           = "Test Form"
+  internal_name   = "Test Form"
+  external_title  = "Test Form"
   organization_id = "Collaborative Centre for Genomic Cancer Medicine"
+
+  fields = [
+    {
+      "title" : "Title",
+      "type" : "text",
+      "optional" : false
+    },
+
+    {
+      "title" : "ph.number",
+      "type" : "phone-number",
+    },
+    {
+      "title" : "Email",
+      "type" : "email"
+    },
+
+    {
+      "title" : "Date",
+      "type" : "date"
+    },
+
+    # {
+    #   "title" : "multiselect",
+    #   "type" : "multiselect"
+    # },
+    {
+      "title" : "Attachment",
+      "type" : "attachment"
+    },
+  ]
+
 }
 
-# output "edu_coffees" {
-#   value = remscontent_license.example_license.id
-# }

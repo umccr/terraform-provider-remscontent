@@ -60,9 +60,7 @@ func (d *OrganizationDataSource) Read(ctx context.Context, req datasource.ReadRe
 		return
 	}
 
-	orgsResult, _, err := d.client.OrganizationsAPI.
-		ApiOrganizationsOrganizationIdGet(ctx, data.Id.ValueString()).
-		Execute()
+	orgsResult, err := d.client.GetAPIOrganizationsOrganizationIDWithResponse(ctx, data.Id.ValueString(), nil)
 
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading organization", err.Error())
