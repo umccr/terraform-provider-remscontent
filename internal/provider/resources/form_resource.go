@@ -15,9 +15,12 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"github.com/umccr/terraform-provider-remscontent/internal/provider/shared"
+
 	remsclient "github.com/umccr/terraform-provider-remscontent/internal/rems-client"
 )
 
@@ -39,79 +42,52 @@ type FormResource struct {
 	BaseRemsResource
 }
 
-/*
-OpenAPI spec for forms
+type KeyLabelModel struct {
+	Key   types.String `tfsdk:"key"`
+	Label types.String `tfsdk:"label"`
+}
 
-	{
-	  "organization": {
-	    "organization/id": "string"
-	  },
-	  "form/title": "string",
-	  "form/internal-name": "string",
-	  "form/external-title": {
-	    "fi": "text in Finnish",
-	    "en": "text in English"
-	  },
-	  "form/fields": [
-	    {
-	      "field/info-text": {
-	        "fi": "text in Finnish",
-	        "en": "text in English"
-	      },
-	      "field/title": {
-	        "fi": "text in Finnish",
-	        "en": "text in English"
-	      },
-	      "field/columns": [
-	        {
-	          "key": "string",
-	          "label": {
-	            "fi": "text in Finnish",
-	            "en": "text in English"
-	          }
-	        }
-	      ],
-	      "field/max-length": 0,
-	      "field/options": [
-	        {
-	          "key": "string",
-	          "label": {
-	            "fi": "text in Finnish",
-	            "en": "text in English"
-	          }
-	        }
-	      ],
-	      "field/privacy": "private",
-	      "field/visibility": {
-	        "visibility/type": "only-if",
-	        "visibility/field": {
-	          "field/id": "string"
-	        },
-	        "visibility/values": [
-	          "string"
-	        ]
-	      },
-	      "field/type": "description",
-	      "field/id": "string",
-	      "field/optional": true,
-	      "field/placeholder": {
-	        "fi": "text in Finnish",
-	        "en": "text in English"
-	      }
-	    }
-	  ]
-	}
-*/
+var keyLabelSchema = schema.NestedAttributeObject{
+	Attributes: map[string]schema.Attribute{
+		"key": schema.StringAttribute{
+			Required: true,
+		},
+		"label": schema.StringAttribute{
+			Required: true,
+		},
+	},
+}
+
+type VisibilityModel struct {
+	VisibilityType types.String `tfsdk:"visibility_type"`
+	FieldId        types.String `tfsdk:"field_id"`
+	HasValue       *[]string    `tfsdk:"has_value"`
+}
+
 type FormFieldResourceModel struct {
-	Type        types.String `tfsdk:"type"`
-	Title       types.String `tfsdk:"title"`
-	Info        types.String `tfsdk:"info"`
-	Placeholder types.String `tfsdk:"placeholder"`
-	Optional    types.Bool   `tfsdk:"optional"`
+	Id          types.String     `tfsdk:"id"`
+	Type        types.String     `tfsdk:"type"`
+	Title       types.String     `tfsdk:"title"`
+	Info        types.String     `tfsdk:"info"`
+	Placeholder types.String     `tfsdk:"placeholder"`
+	Optional    types.Bool       `tfsdk:"optional"`
+	Options     *[]KeyLabelModel `tfsdk:"options"`
+	Columns     *[]KeyLabelModel `tfsdk:"columns"`
+	MaxLength   types.Int64      `tfsdk:"max_length"`
+	Privacy     types.String     `tfsdk:"privacy"`
+	Visibility  *VisibilityModel `tfsdk:"visibility"`
 }
 
 var fieldSchema = schema.NestedAttributeObject{
 	Attributes: map[string]schema.Attribute{
+		"id": schema.StringAttribute{
+			Computed:            true,
+			Optional:            true,
+			MarkdownDescription: "Field identifier",
+			PlanModifiers: []planmodifier.String{
+				stringplanmodifier.UseStateForUnknown(),
+			},
+		},
 		"type": schema.StringAttribute{
 			Required: true,
 			Validators: []validator.String{
@@ -133,10 +109,12 @@ var fieldSchema = schema.NestedAttributeObject{
 			},
 		},
 		"title": schema.StringAttribute{
-			Required: true,
+			Required:            true,
+			MarkdownDescription: "The title for the field",
 		},
 		"info": schema.StringAttribute{
-			Optional: true,
+			Optional:            true,
+			MarkdownDescription: "Field description explain applicants what the field about.",
 		},
 		"placeholder": schema.StringAttribute{
 			Optional: true,
@@ -145,6 +123,52 @@ var fieldSchema = schema.NestedAttributeObject{
 			Optional: true,
 			Computed: true,
 			Default:  booldefault.StaticBool(false),
+		},
+		"options": schema.ListNestedAttribute{
+			NestedObject: keyLabelSchema,
+			Optional:     true,
+		},
+		"columns": schema.ListNestedAttribute{
+			NestedObject: keyLabelSchema,
+			Optional:     true,
+		},
+		"max_length": schema.Int64Attribute{
+			Optional:            true,
+			MarkdownDescription: "maximum character for the field",
+		},
+		"privacy": schema.StringAttribute{
+			Optional:            true,
+			MarkdownDescription: "Visibility of the field. Default: `public`",
+			Validators: []validator.String{
+				stringvalidator.OneOf(
+					"public",
+					"private",
+				),
+			},
+		},
+		"visibility": schema.SingleNestedAttribute{
+			Optional:            true,
+			MarkdownDescription: "Defines conditional visibility for this field, driven by the value of a referenced option or multiselect field.",
+			Attributes: map[string]schema.Attribute{
+				"visibility_type": schema.StringAttribute{
+					Required:            true,
+					MarkdownDescription: "When to show this field. Use `always` to always show, or `only-if` to show only when another field matches a specific value. Default: always",
+					Validators: []validator.String{
+						stringvalidator.OneOf(
+							"only-if", "always",
+						),
+					},
+				},
+				"field_id": schema.StringAttribute{
+					Optional:            true,
+					MarkdownDescription: "The ID of the field this visibility depends on. Only applies when `visibility_type` is `only-if`.",
+				},
+				"has_value": schema.ListAttribute{
+					Optional:            true,
+					MarkdownDescription: "List of option keys that the field referenced by `field_id` must match for this field to be visible. Only applies when `visibility_type` is `only-if`.",
+					ElementType:         types.StringType,
+				},
+			},
 		},
 	},
 }
@@ -186,7 +210,7 @@ func (r *FormResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 			},
 			"fields": schema.ListNestedAttribute{
 				NestedObject: fieldSchema,
-				Optional:     true,
+				Required:     true,
 			},
 			"enabled": schema.BoolAttribute{
 				Optional:            true,
@@ -213,17 +237,6 @@ func (r *FormResource) Create(ctx context.Context, req resource.CreateRequest, r
 		return
 	}
 
-	var fields []remsclient.NewFieldTemplate
-	for _, item := range plan.Fields {
-		fields = append(fields, remsclient.NewFieldTemplate{
-			FieldType:        remsclient.NewFieldTemplateFieldType(item.Type.ValueString()),
-			FieldTitle:       *toLocalizedString(item.Title),
-			FieldOptional:    item.Optional.ValueBool(),
-			FieldPlaceholder: toLocalizedString(item.Placeholder),
-			FieldInfoText:    toLocalizedString(item.Info),
-		})
-	}
-
 	formCreateCommand := remsclient.CreateFormCommand{
 		Organization: remsclient.OrganizationID{
 			OrganizationID: plan.OrganizationId.ValueString(),
@@ -232,27 +245,18 @@ func (r *FormResource) Create(ctx context.Context, req resource.CreateRequest, r
 		FormExternalTitle: &remsclient.LocalizedString{
 			"en": plan.ExternalTitle.ValueString(),
 		},
-		FormFields: fields,
+		FormFields: fromFormFieldModels(plan.Fields),
 	}
-	formResult, err := r.client.PostAPIFormsCreateWithResponse(ctx, nil, formCreateCommand)
-
-	if err != nil || formResult.JSON200.ID == nil {
-
-		var errorDetail string
-		if err != nil {
-			errorDetail = fmt.Sprintf("Unable to create form: %s", err)
-		} else {
-			errorDetail = "API returned a nil ID for the created license."
-		}
-
-		resp.Diagnostics.AddError(
-			"Error Creating Form",
-			errorDetail,
-		)
+	formResponse, formErr := r.client.PostAPIFormsCreateWithResponse(ctx, nil, formCreateCommand)
+	if shared.HandleAPIError(&resp.Diagnostics, "Error Checking Form Editable", formErr, formResponse.StatusCode(), formResponse.Body) {
+		return
+	}
+	if formResponse.JSON200.ID == nil {
+		resp.Diagnostics.AddError("Unable to get id: ", string(formResponse.Body))
 		return
 	}
 
-	plan.Id = types.Int64Value(*formResult.JSON200.ID)
+	plan.Id = types.Int64Value(*formResponse.JSON200.ID)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 
 }
@@ -266,29 +270,25 @@ func (r *FormResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	}
 	formId := state.Id.ValueInt64()
 
-	formItemResponse, err := r.client.GetAPIFormsFormIDWithResponse(ctx, formId, nil)
-	formData := formItemResponse.JSON200
-
-	if err != nil || formData == nil {
-		resp.Diagnostics.AddError("Error", err.Error())
+	formItemResponse, fromItemErr := r.client.GetAPIFormsFormIDWithResponse(ctx, formId, nil)
+	if shared.HandleAPIError(&resp.Diagnostics, "Error Checking Form Editable", fromItemErr, formItemResponse.StatusCode(), formItemResponse.Body) {
 		return
 	}
+	if formItemResponse.JSON200 == nil {
+		resp.Diagnostics.AddError("Unable to edit given form id: ", string(formItemResponse.Body))
+		return
+	}
+	formData := formItemResponse.JSON200
 
 	state.Enabled = types.BoolValue(formData.Enabled)
 	state.Archived = types.BoolValue(formData.Archived)
 	state.InternalName = types.StringValue(formData.FormInternalName)
 	state.OrganizationId = types.StringValue(formData.Organization.OrganizationID)
-	state.ExternalTitle = types.StringValue(formData.FormExternalTitle["en"])
+	state.ExternalTitle = shared.GetLocalizedString(&formData.FormExternalTitle)
 
 	state.Fields = []FormFieldResourceModel{}
 	for _, formItem := range formData.FormFields {
-		state.Fields = append(state.Fields, FormFieldResourceModel{
-			Type:        types.StringValue(string(formItem.FieldType)),
-			Title:       getLocalizedString(&formItem.FieldTitle),
-			Info:        getLocalizedString(formItem.FieldInfoText),
-			Placeholder: getLocalizedString(formItem.FieldPlaceholder),
-			Optional:    types.BoolValue(formItem.FieldOptional),
-		})
+		state.Fields = append(state.Fields, toFormFieldModel(formItem))
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
@@ -306,23 +306,12 @@ func (r *FormResource) Update(ctx context.Context, req resource.UpdateRequest, r
 
 	// check if forms is editable
 	isEditable, isEditableErr := r.client.GetAPIFormsFormIDEditableWithResponse(ctx, formID, nil)
-	if isEditableErr != nil || isEditable.JSON200.Success == false {
-		resp.Diagnostics.AddError(
-			"Error Forms Not Editable",
-			fmt.Sprintf("Unable to edit form id: %d", plan.Id.ValueInt64()),
-		)
+	if shared.HandleAPIError(&resp.Diagnostics, "Error Checking Form Editable", isEditableErr, isEditable.StatusCode(), isEditable.Body) {
 		return
 	}
-
-	var fields []remsclient.NewFieldTemplate
-	for _, item := range plan.Fields {
-		fields = append(fields, remsclient.NewFieldTemplate{
-			FieldType:        remsclient.NewFieldTemplateFieldType(item.Type.ValueString()),
-			FieldTitle:       *toLocalizedString(item.Title),
-			FieldOptional:    item.Optional.ValueBool(),
-			FieldPlaceholder: toLocalizedString(item.Placeholder),
-			FieldInfoText:    toLocalizedString(item.Info),
-		})
+	if isEditable.JSON200 == nil || !isEditable.JSON200.Success {
+		resp.Diagnostics.AddError("Unable to edit given form id: ", string(isEditable.Body))
+		return
 	}
 
 	formUpdateCommand := remsclient.EditFormCommand{
@@ -331,16 +320,17 @@ func (r *FormResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		},
 		FormInternalName:  plan.InternalName.ValueStringPointer(),
 		FormID:            plan.Id.ValueInt64(),
-		FormExternalTitle: toLocalizedString(plan.ExternalTitle),
-		FormFields:        fields,
+		FormExternalTitle: shared.ToLocalizedString(plan.ExternalTitle),
+		FormFields:        fromFormFieldModels(plan.Fields),
 	}
 
 	updateResponse, updateErr := r.client.PutAPIFormsEditWithResponse(ctx, nil, formUpdateCommand)
-	if updateErr != nil || updateResponse.JSON200 == nil || updateResponse.JSON200.Success == false {
-		resp.Diagnostics.AddError(
-			"Error Updating Form",
-			fmt.Sprintf("Unable to edit on form id: %d", plan.Id.ValueInt64()),
-		)
+	if shared.HandleAPIError(&resp.Diagnostics, "Error Updating Form", updateErr, updateResponse.StatusCode(), updateResponse.Body) {
+		return
+	}
+	tflog.Info(ctx, fmt.Sprintf("ASFJKFGVHD: %v", updateResponse.JSON200.Success))
+	if updateResponse.JSON200 == nil || !updateResponse.JSON200.Success {
+		resp.Diagnostics.AddError("Edit unsuccasdessful for the given form id: ", string(isEditable.Body))
 		return
 	}
 
@@ -350,11 +340,11 @@ func (r *FormResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		Archived: plan.Archived.ValueBool(),
 	}
 	archiveResponse, archiveErr := r.client.PutAPIFormsArchivedWithResponse(ctx, nil, formArchiveCommand)
-	if archiveErr != nil || archiveResponse.JSON200 == nil || archiveResponse.JSON200.Success == false {
-		resp.Diagnostics.AddError(
-			"Error Setting Archiving Form",
-			fmt.Sprintf("Unable to set archive/unarchive on form id: %d", plan.Id.ValueInt64()),
-		)
+	if shared.HandleAPIError(&resp.Diagnostics, "Error Archiving Form", archiveErr, archiveResponse.StatusCode(), archiveResponse.Body) {
+		return
+	}
+	if archiveResponse.JSON200 == nil || !archiveResponse.JSON200.Success {
+		resp.Diagnostics.AddError("Archiving/unarchive unsuccessful for the given form id: ", string(isEditable.Body))
 		return
 	}
 
@@ -364,32 +354,22 @@ func (r *FormResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		Enabled: plan.Enabled.ValueBool(),
 	}
 	enabledResponse, enabledErr := r.client.PutAPIFormsEnabledWithResponse(ctx, nil, formEnabledCommand)
-	if enabledErr != nil || enabledResponse.JSON200.Success == false {
-		resp.Diagnostics.AddError(
-			"Error Setting Enabled Form",
-			fmt.Sprintf("Unable to set enabled/disabled on form id: %d", plan.Id.ValueInt64()),
-		)
+	if shared.HandleAPIError(&resp.Diagnostics, "Error Setting Form Enabled", enabledErr, enabledResponse.StatusCode(), enabledResponse.Body) {
+		return
+	}
+	if enabledResponse.JSON200 == nil || !enabledResponse.JSON200.Success {
+		resp.Diagnostics.AddError("Enabled/disabled unsuccessful for the given form id: ", string(isEditable.Body))
 		return
 	}
 
 	formItemResponse, formItemErr := r.client.GetAPIFormsFormIDWithResponse(ctx, formID, nil)
-	if formItemErr != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading Updated Form",
-			fmt.Sprintf("Could not read Form ID: %d", plan.Id.ValueInt64()),
-		)
+	if shared.HandleAPIError(&resp.Diagnostics, "Error Reading Updated Form", formItemErr, formItemResponse.StatusCode(), formItemResponse.Body) {
 		return
 	}
 
 	plan.Fields = []FormFieldResourceModel{}
 	for _, formItem := range formItemResponse.JSON200.FormFields {
-		plan.Fields = append(plan.Fields, FormFieldResourceModel{
-			Type:        types.StringValue(string(formItem.FieldType)),
-			Title:       getLocalizedString(&formItem.FieldTitle),
-			Info:        getLocalizedString(formItem.FieldInfoText),
-			Placeholder: getLocalizedString(formItem.FieldPlaceholder),
-			Optional:    types.BoolValue(formItem.FieldOptional),
-		})
+		plan.Fields = append(plan.Fields, toFormFieldModel(formItem))
 	}
 
 	// Save updated data into Terraform state
@@ -410,12 +390,11 @@ func (r *FormResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 		Archived: true,
 	}
 	archiveFormResponse, err := r.client.PutAPIFormsArchivedWithResponse(ctx, nil, formArchiveCommand)
-
-	if err != nil || archiveFormResponse.JSON200.Success == false {
-		resp.Diagnostics.AddError(
-			"Error Archiving Form",
-			fmt.Sprintf("Unable to archive form id: %d", state.Id.ValueInt64()),
-		)
+	if shared.HandleAPIError(&resp.Diagnostics, "Error Archiving Form", err, archiveFormResponse.StatusCode(), archiveFormResponse.Body) {
+		return
+	}
+	if archiveFormResponse.JSON200 == nil || !archiveFormResponse.JSON200.Success {
+		resp.Diagnostics.AddError("Archiving/unarchive unsuccessful for the given form id: ", string(archiveFormResponse.Body))
 		return
 	}
 
@@ -440,10 +419,275 @@ func (r *FormResource) ValidateConfig(ctx context.Context, req resource.Validate
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
-    // Add some config validation for the followong fields
-    
+	// Only check if fields are present at the form
+	if len(data.Fields) == 0 {
+		return
+	}
+
+	// Build a map of field ID to valid option keys for each field.
+	// This enables validation of visibility rules, ensuring that:
+	// - The referenced field_id exists in the form.
+	// - Each value in has_value is a valid option key for the referenced field.
+	// Used for cross-field validation in form configuration.
+	fieldOptionKeys := make(map[string]map[string]bool, len(data.Fields))
+	for _, f := range data.Fields {
+		if !f.Id.IsNull() && !f.Id.IsUnknown() {
+			keys := make(map[string]bool)
+			if f.Options != nil {
+				for _, opt := range *f.Options {
+					if !opt.Key.IsNull() && !opt.Key.IsUnknown() {
+						keys[opt.Key.ValueString()] = true
+					}
+				}
+			}
+			fieldOptionKeys[f.Id.ValueString()] = keys
+		}
+	}
+
+	// Iterate every fields in the array
+	for i, item := range data.Fields {
+		fieldPath := path.Root("fields").AtListIndex(i)
+		fieldType := item.Type.ValueString()
+
+		// option/multiselect must have options
+		shouldHaveOptions := fieldType == "option" || fieldType == "multiselect"
+		if shouldHaveOptions && item.Options == nil {
+			resp.Diagnostics.AddAttributeError(
+				fieldPath.AtName("options"),
+				"Missing options",
+				fmt.Sprintf("`options` is required when field type is `%s`.", fieldType),
+			)
+		}
+		if !shouldHaveOptions && item.Options != nil {
+			resp.Diagnostics.AddAttributeError(
+				fieldPath.AtName("options"),
+				"Unexpected options",
+				fmt.Sprintf("`options` should not be set when field type is `%s`.", fieldType),
+			)
+		}
+
+		// table must have columns
+		if fieldType == "table" && item.Columns == nil {
+			resp.Diagnostics.AddAttributeError(
+				fieldPath.AtName("columns"),
+				"Missing columns",
+				"`columns` is required when field type is `table`.",
+			)
+		}
+		if fieldType != "table" && item.Columns != nil {
+			resp.Diagnostics.AddAttributeError(
+				fieldPath.AtName("columns"),
+				"Unexpected columns",
+				"`columns` should only be set when field type is `table`.",
+			)
+		}
+
+		// visibility only-if must have field_id and has_value
+		// visibility always must not have field_id and has_value
+		if item.Visibility != nil {
+			visibilityPath := fieldPath.AtName("visibility")
+			visibilityType := item.Visibility.VisibilityType.ValueString()
+
+			switch visibilityType {
+			case "only-if":
+				if item.Visibility.FieldId.IsNull() {
+					resp.Diagnostics.AddAttributeError(
+						visibilityPath.AtName("field_id"),
+						"Missing field_id",
+						"`field_id` is required when `visibility_type` is `only-if`.",
+					)
+				} else {
+					// Check for refId existence with other field's id
+					refId := item.Visibility.FieldId.ValueString()
+					optionKeys, exists := fieldOptionKeys[refId]
+					if !exists {
+						resp.Diagnostics.AddAttributeError(
+							visibilityPath.AtName("field_id"),
+							"Invalid field_id",
+							fmt.Sprintf("`field_id` `%s` does not reference any field in this form.", refId),
+						)
+					} else if item.Visibility.HasValue != nil {
+						// check if the has_value is referring to the options available from the refId
+						for _, val := range *item.Visibility.HasValue {
+							if !optionKeys[val] {
+								resp.Diagnostics.AddAttributeError(
+									visibilityPath.AtName("has_value"),
+									"Invalid has_value",
+									fmt.Sprintf("`%s` is not a valid option key in field `%s`.", val, refId),
+								)
+							}
+						}
+					}
+
+				}
+
+				if item.Visibility.HasValue == nil || len(*item.Visibility.HasValue) == 0 {
+					resp.Diagnostics.AddAttributeError(
+						visibilityPath.AtName("has_value"),
+						"Missing has_value",
+						"`has_value` is required when `visibility_type` is `only-if`.",
+					)
+				}
+			case "always":
+				if !item.Visibility.FieldId.IsNull() {
+					resp.Diagnostics.AddAttributeError(
+						visibilityPath.AtName("field_id"),
+						"Unexpected field_id",
+						"`field_id` should not be set when `visibility_type` is `always`.",
+					)
+				}
+				if item.Visibility.HasValue != nil && len(*item.Visibility.HasValue) > 0 {
+					resp.Diagnostics.AddAttributeError(
+						visibilityPath.AtName("has_value"),
+						"Unexpected has_value",
+						"`has_value` should not be set when `visibility_type` is `always`.",
+					)
+				}
+			}
+		}
+	}
+
+	// check for visibility whether the value complies with other fields
+
 	// regular: title, text, texta, date, email, phone, ip
 	// optons: options, multi-select, table
 	// no value: label, header
 
+}
+
+// Helper func
+func toKeyLabelOptions(item *[]remsclient.FormTemplateFieldsOptions) *[]KeyLabelModel {
+	if item == nil {
+		return nil
+	}
+	opts := make([]KeyLabelModel, 0, len(*item))
+	for _, opt := range *item {
+		opts = append(opts, KeyLabelModel{
+			Key:   types.StringValue(opt.Key),
+			Label: shared.GetLocalizedString(&opt.Label),
+		})
+	}
+	return &opts
+}
+
+func toKeyLabelColumns(item *[]remsclient.FormTemplateFieldsColumns) *[]KeyLabelModel {
+	if item == nil {
+		return nil
+	}
+	opts := make([]KeyLabelModel, 0, len(*item))
+	for _, opt := range *item {
+		opts = append(opts, KeyLabelModel{
+			Key:   types.StringValue(opt.Key),
+			Label: shared.GetLocalizedString(&opt.Label),
+		})
+	}
+	return &opts
+}
+
+func toVisibilityModel(item *remsclient.FormTemplateFieldsVisibility) *VisibilityModel {
+	if item == nil {
+		return nil
+	}
+
+	var fieldId types.String
+	if item.VisibilityField != nil {
+		fieldId = types.StringValue(item.VisibilityField.FieldID)
+	}
+
+	return &VisibilityModel{
+		VisibilityType: types.StringValue(string(item.VisibilityType)),
+		FieldId:        fieldId,
+		HasValue:       item.VisibilityValues,
+	}
+}
+
+func toFormFieldModel(formItem remsclient.FieldTemplate) FormFieldResourceModel {
+
+	return FormFieldResourceModel{
+		Id:          types.StringValue(formItem.FieldID),
+		Type:        types.StringValue(string(formItem.FieldType)),
+		Title:       shared.GetLocalizedString(&formItem.FieldTitle),
+		Info:        shared.GetLocalizedString(formItem.FieldInfoText),
+		Placeholder: shared.GetLocalizedString(formItem.FieldPlaceholder),
+		Optional:    types.BoolValue(formItem.FieldOptional),
+		Options:     toKeyLabelOptions(formItem.FieldOptions),
+		Columns:     toKeyLabelColumns(formItem.FieldColumns),
+		MaxLength:   types.Int64PointerValue(formItem.FieldMaxLength),
+		Privacy:     types.StringPointerValue((*string)(formItem.FieldPrivacy)),
+		Visibility:  toVisibilityModel(formItem.FieldVisibility),
+	}
+}
+
+func fromKeyLabelOptions(items *[]KeyLabelModel) *[]remsclient.CreateFormCommandFieldsOptions {
+	if items == nil {
+		return nil
+	}
+	opts := make([]remsclient.CreateFormCommandFieldsOptions, 0, len(*items))
+	for _, item := range *items {
+		opts = append(opts, remsclient.CreateFormCommandFieldsOptions{
+			Key:   item.Key.ValueString(),
+			Label: *shared.ToLocalizedString(item.Label),
+		})
+	}
+	return &opts
+}
+
+func fromKeyLabelColumns(items *[]KeyLabelModel) *[]remsclient.CreateFormCommandFieldsColumns {
+	if items == nil {
+		return nil
+	}
+	cols := make([]remsclient.CreateFormCommandFieldsColumns, 0, len(*items))
+	for _, item := range *items {
+		cols = append(cols, remsclient.CreateFormCommandFieldsColumns{
+			Key:   item.Key.ValueString(),
+			Label: *shared.ToLocalizedString(item.Label),
+		})
+	}
+	return &cols
+}
+
+func fromVisibilityModel(item *VisibilityModel) *remsclient.CreateFormCommandFieldsVisibility {
+	if item == nil {
+		return nil
+	}
+
+	var visibilityField *remsclient.CreateFormCommandFieldsVisibilityField
+	if !item.FieldId.IsNull() && !item.FieldId.IsUnknown() {
+		visibilityField = &remsclient.CreateFormCommandFieldsVisibilityField{
+			FieldID: item.FieldId.ValueString(),
+		}
+	}
+
+	return &remsclient.CreateFormCommandFieldsVisibility{
+		VisibilityField:  visibilityField,
+		VisibilityType:   remsclient.CreateFormCommandFieldsVisibilityVisibilityType(item.VisibilityType.ValueString()),
+		VisibilityValues: item.HasValue,
+	}
+}
+
+func fromFormFieldModels(items []FormFieldResourceModel) []remsclient.NewFieldTemplate {
+	fields := make([]remsclient.NewFieldTemplate, 0, len(items))
+	for _, item := range items {
+
+		var fieldPrivacy *remsclient.NewFieldTemplateFieldPrivacy
+		if !item.Privacy.IsNull() && !item.Privacy.IsUnknown() {
+			p := remsclient.NewFieldTemplateFieldPrivacy(item.Privacy.ValueString())
+			fieldPrivacy = &p
+		}
+
+		fields = append(fields, remsclient.NewFieldTemplate{
+			FieldID:          item.Id.ValueStringPointer(),
+			FieldType:        remsclient.NewFieldTemplateFieldType(item.Type.ValueString()),
+			FieldTitle:       *shared.ToLocalizedString(item.Title),
+			FieldOptional:    item.Optional.ValueBool(),
+			FieldPlaceholder: shared.ToLocalizedString(item.Placeholder),
+			FieldInfoText:    shared.ToLocalizedString(item.Info),
+			FieldOptions:     fromKeyLabelOptions(item.Options),
+			FieldColumns:     fromKeyLabelColumns(item.Columns),
+			FieldMaxLength:   item.MaxLength.ValueInt64Pointer(),
+			FieldPrivacy:     fieldPrivacy,
+			FieldVisibility:  fromVisibilityModel(item.Visibility),
+		})
+	}
+	return fields
 }

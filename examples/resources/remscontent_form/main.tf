@@ -36,14 +36,29 @@ resource "remscontent_form" "test_form" {
       "title" : "Date",
       "type" : "date"
     },
-
-    # {
-    #   "title" : "multiselect",
-    #   "type" : "multiselect"
-    # },
+    {
+      "id" : "attaching-5"
+      "title" : "attach file?",
+      "type" : "option",
+      "options" : [
+        {
+          "key" : "y",
+          "label" : "yes"
+        },
+        {
+          "key" : "n",
+          "label" : "no"
+        }
+      ]
+    },
     {
       "title" : "Attachment",
-      "type" : "attachment"
+      "type" : "attachment",
+      "visibility" : {
+        "visibility_type" : "only-if",
+        "field_id" : "attaching-5",
+        "has_value" : ["n"]
+      }
     },
   ]
 
