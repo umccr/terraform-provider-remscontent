@@ -328,7 +328,7 @@ func (r *FormResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	if shared.HandleAPIError(&resp.Diagnostics, "Error Updating Form", updateErr, updateResponse.StatusCode(), updateResponse.Body) {
 		return
 	}
-	tflog.Info(ctx, fmt.Sprintf("ASFJKFGVHD: %v", updateResponse.JSON200.Success))
+
 	if updateResponse.JSON200 == nil || !updateResponse.JSON200.Success {
 		resp.Diagnostics.AddError("Edit unsuccasdessful for the given form id: ", string(isEditable.Body))
 		return
