@@ -248,11 +248,12 @@ func (r *FormResource) Create(ctx context.Context, req resource.CreateRequest, r
 		FormFields: fromFormFieldModels(plan.Fields),
 	}
 	formResponse, formErr := r.client.PostAPIFormsCreateWithResponse(ctx, nil, formCreateCommand)
-	if shared.HandleAPIError(&resp.Diagnostics, "Error Checking Form Editable", formErr, formResponse.StatusCode(), formResponse.Body) {
+	if formErr != nil {
+		resp.Diagnostics.AddError("Error Creating Form", formErr.Error())
 		return
 	}
-	if formResponse.JSON200.ID == nil {
-		resp.Diagnostics.AddError("Unable to get id: ", string(formResponse.Body))
+	if formResponse.StatusCode() != 200 || formResponse.JSON200 == nil {
+		resp.Diagnostics.AddError("Error Creating Form", fmt.Sprintf("status: %d, body: %s", formResponse.StatusCode(), string(formResponse.Body)))
 		return
 	}
 
@@ -271,11 +272,12 @@ func (r *FormResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	formId := state.Id.ValueInt64()
 
 	formItemResponse, fromItemErr := r.client.GetAPIFormsFormIDWithResponse(ctx, formId, nil)
-	if shared.HandleAPIError(&resp.Diagnostics, "Error Checking Form Editable", fromItemErr, formItemResponse.StatusCode(), formItemResponse.Body) {
+	if fromItemErr != nil {
+		resp.Diagnostics.AddError("Error Reading Form", fromItemErr.Error())
 		return
 	}
-	if formItemResponse.JSON200 == nil {
-		resp.Diagnostics.AddError("Unable to edit given form id: ", string(formItemResponse.Body))
+	if formItemResponse.StatusCode() != 200 || formItemResponse.JSON200 == nil {
+		resp.Diagnostics.AddError("Error Reading Form", fmt.Sprintf("status: %d, body: %s", formItemResponse.StatusCode(), string(formItemResponse.Body)))
 		return
 	}
 	formData := formItemResponse.JSON200
@@ -304,12 +306,17 @@ func (r *FormResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	}
 	formID := plan.Id.ValueInt64()
 
-	// check if forms is editable
+	// check if forms is editable before calling update
 	isEditable, isEditableErr := r.client.GetAPIFormsFormIDEditableWithResponse(ctx, formID, nil)
-	if shared.HandleAPIError(&resp.Diagnostics, "Error Checking Form Editable", isEditableErr, isEditable.StatusCode(), isEditable.Body) {
+	if isEditableErr != nil {
+		resp.Diagnostics.AddError("Error Checking Editable Form", isEditableErr.Error())
 		return
 	}
-	if isEditable.JSON200 == nil || !isEditable.JSON200.Success {
+	if isEditable.StatusCode() != 200 || isEditable.JSON200 == nil {
+		resp.Diagnostics.AddError("Error Checking Editable Form", fmt.Sprintf("status: %d, body: %s", isEditable.StatusCode(), string(isEditable.Body)))
+		return
+	}
+	if !isEditable.JSON200.Success {
 		resp.Diagnostics.AddError("Unable to edit given form id: ", string(isEditable.Body))
 		return
 	}
@@ -325,12 +332,12 @@ func (r *FormResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	}
 
 	updateResponse, updateErr := r.client.PutAPIFormsEditWithResponse(ctx, nil, formUpdateCommand)
-	if shared.HandleAPIError(&resp.Diagnostics, "Error Updating Form", updateErr, updateResponse.StatusCode(), updateResponse.Body) {
+	if updateErr != nil {
+		resp.Diagnostics.AddError("Error Updating Form", updateErr.Error())
 		return
 	}
-
-	if updateResponse.JSON200 == nil || !updateResponse.JSON200.Success {
-		resp.Diagnostics.AddError("Edit unsuccasdessful for the given form id: ", string(isEditable.Body))
+	if isEditable.StatusCode() != 200 || isEditable.JSON200 == nil {
+		resp.Diagnostics.AddError("Error Updating Form", fmt.Sprintf("status: %d, body: %s", updateResponse.StatusCode(), string(updateResponse.Body)))
 		return
 	}
 
@@ -340,11 +347,12 @@ func (r *FormResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		Archived: plan.Archived.ValueBool(),
 	}
 	archiveResponse, archiveErr := r.client.PutAPIFormsArchivedWithResponse(ctx, nil, formArchiveCommand)
-	if shared.HandleAPIError(&resp.Diagnostics, "Error Archiving Form", archiveErr, archiveResponse.StatusCode(), archiveResponse.Body) {
+	if archiveErr != nil {
+		resp.Diagnostics.AddError("Error Archiving/Unarchiving Form", archiveErr.Error())
 		return
 	}
-	if archiveResponse.JSON200 == nil || !archiveResponse.JSON200.Success {
-		resp.Diagnostics.AddError("Archiving/unarchive unsuccessful for the given form id: ", string(isEditable.Body))
+	if archiveResponse.StatusCode() != 200 || archiveResponse.JSON200 == nil {
+		resp.Diagnostics.AddError("Error Archiving/Unarchiving Form", fmt.Sprintf("status: %d, body: %s", archiveResponse.StatusCode(), string(archiveResponse.Body)))
 		return
 	}
 
@@ -354,16 +362,22 @@ func (r *FormResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		Enabled: plan.Enabled.ValueBool(),
 	}
 	enabledResponse, enabledErr := r.client.PutAPIFormsEnabledWithResponse(ctx, nil, formEnabledCommand)
-	if shared.HandleAPIError(&resp.Diagnostics, "Error Setting Form Enabled", enabledErr, enabledResponse.StatusCode(), enabledResponse.Body) {
+	if enabledErr != nil {
+		resp.Diagnostics.AddError("Error Enabled/Disabled Form", enabledErr.Error())
 		return
 	}
-	if enabledResponse.JSON200 == nil || !enabledResponse.JSON200.Success {
-		resp.Diagnostics.AddError("Enabled/disabled unsuccessful for the given form id: ", string(isEditable.Body))
+	if enabledResponse.StatusCode() != 200 || enabledResponse.JSON200 == nil {
+		resp.Diagnostics.AddError("Error Enabled/Disabled Form", fmt.Sprintf("status: %d, body: %s", enabledResponse.StatusCode(), string(enabledResponse.Body)))
 		return
 	}
 
 	formItemResponse, formItemErr := r.client.GetAPIFormsFormIDWithResponse(ctx, formID, nil)
-	if shared.HandleAPIError(&resp.Diagnostics, "Error Reading Updated Form", formItemErr, formItemResponse.StatusCode(), formItemResponse.Body) {
+	if formItemErr != nil {
+		resp.Diagnostics.AddError("Error Retrieving Form", formItemErr.Error())
+		return
+	}
+	if formItemResponse.StatusCode() != 200 || formItemResponse.JSON200 == nil {
+		resp.Diagnostics.AddError("Error Retrieving Form", fmt.Sprintf("status: %d, body: %s", formItemResponse.StatusCode(), string(formItemResponse.Body)))
 		return
 	}
 
@@ -390,11 +404,12 @@ func (r *FormResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 		Archived: true,
 	}
 	archiveFormResponse, err := r.client.PutAPIFormsArchivedWithResponse(ctx, nil, formArchiveCommand)
-	if shared.HandleAPIError(&resp.Diagnostics, "Error Archiving Form", err, archiveFormResponse.StatusCode(), archiveFormResponse.Body) {
+	if err != nil {
+		resp.Diagnostics.AddError("Error Archiving/Unarchiving Form", err.Error())
 		return
 	}
-	if archiveFormResponse.JSON200 == nil || !archiveFormResponse.JSON200.Success {
-		resp.Diagnostics.AddError("Archiving/unarchive unsuccessful for the given form id: ", string(archiveFormResponse.Body))
+	if archiveFormResponse.StatusCode() != 200 || archiveFormResponse.JSON200 == nil {
+		resp.Diagnostics.AddError("Error Archiving/Unarchiving Form", fmt.Sprintf("status: %d, body: %s", archiveFormResponse.StatusCode(), string(archiveFormResponse.Body)))
 		return
 	}
 

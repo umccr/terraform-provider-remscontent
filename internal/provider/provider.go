@@ -36,6 +36,8 @@ type RemsContentProvider struct {
 	// provider is built and ran locally, and "test" when running acceptance
 	// testing.
 	version string
+	// For mocks in tests
+	clientOverride *remsclient.ClientWithResponses
 }
 
 // contentTypeTransport strips charset from Content-Type headers
@@ -89,6 +91,13 @@ func (p *RemsContentProvider) Schema(ctx context.Context, req provider.SchemaReq
 }
 
 func (p *RemsContentProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
+	if p.clientOverride != nil {
+		// To allow mock responses when testing
+		resp.ResourceData = p.clientOverride
+		resp.DataSourceData = p.clientOverride
+		return
+	}
+
 	var config RemsContentProviderModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 
@@ -202,6 +211,7 @@ func (p *RemsContentProvider) Resources(ctx context.Context) []func() resource.R
 	return []func() resource.Resource{
 		resources.NewLicenseResource,
 		resources.NewFormResource,
+		resources.NewWorkflowResource,
 	}
 }
 
@@ -213,6 +223,7 @@ func (p *RemsContentProvider) DataSources(ctx context.Context) []func() datasour
 	return []func() datasource.DataSource{
 		data_sources.NewOrganizationDataSource,
 		data_sources.NewLicenseDataSource,
+		data_sources.NewActorDataSource,
 	}
 }
 
@@ -230,5 +241,12 @@ func New(version string) func() provider.Provider {
 		return &RemsContentProvider{
 			version: version,
 		}
+	}
+}
+
+// Add a test constructor
+func NewWithClient(version string, c *remsclient.ClientWithResponses) func() provider.Provider {
+	return func() provider.Provider {
+		return &RemsContentProvider{version: version, clientOverride: c}
 	}
 }
