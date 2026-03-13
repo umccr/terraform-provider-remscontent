@@ -212,6 +212,9 @@ func (p *RemsContentProvider) Resources(ctx context.Context) []func() resource.R
 		resources.NewLicenseResource,
 		resources.NewFormResource,
 		resources.NewWorkflowResource,
+		resources.NewResourceResource,
+		resources.NewBlacklistResource,
+		resources.NewCatalogueItemResource,
 	}
 }
 
@@ -224,6 +227,7 @@ func (p *RemsContentProvider) DataSources(ctx context.Context) []func() datasour
 		data_sources.NewOrganizationDataSource,
 		data_sources.NewLicenseDataSource,
 		data_sources.NewActorDataSource,
+		data_sources.NewBlacklistUserDataSource,
 	}
 }
 
