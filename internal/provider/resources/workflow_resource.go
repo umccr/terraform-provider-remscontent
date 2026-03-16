@@ -292,6 +292,10 @@ func (r *WorkflowResource) Read(ctx context.Context, req resource.ReadRequest, r
 		resp.Diagnostics.AddError("Error Retrieving Workflow", wfErr.Error())
 		return
 	}
+	if wfResponse.StatusCode() == 404 {
+		resp.State.RemoveResource(ctx)
+		return
+	}
 	if wfResponse.StatusCode() != 200 || wfResponse.JSON200 == nil {
 		resp.Diagnostics.AddError("Error Retrieving Workflow", fmt.Sprintf("status: %d, body: %s", wfResponse.StatusCode(), string(wfResponse.Body)))
 		return

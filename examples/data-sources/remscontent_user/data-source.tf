@@ -10,7 +10,7 @@ provider "remscontent" {
 
 }
 
-data "remscontent_user" "abcd" {
+data "remscontent_actor" "abcd" {
   email = "john@doe.com"
 }
 

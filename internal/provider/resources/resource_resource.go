@@ -1,4 +1,4 @@
- // Copyright (c) HashiCorp, Inc.
+// Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
 package resources
@@ -168,6 +168,10 @@ func (r *ResourceResource) Read(ctx context.Context, req resource.ReadRequest, r
 	readResp, readErr := r.client.GetAPIResourcesResourceIDWithResponse(ctx, state.Id.ValueInt64(), nil)
 	if readErr != nil {
 		resp.Diagnostics.AddError("Error Reading Resource", readErr.Error())
+		return
+	}
+	if readResp.StatusCode() == 404 {
+		resp.State.RemoveResource(ctx)
 		return
 	}
 	if readResp.StatusCode() != 200 || readResp.JSON200 == nil {

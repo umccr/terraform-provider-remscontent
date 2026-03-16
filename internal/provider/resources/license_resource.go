@@ -226,7 +226,10 @@ func (r *LicenseResource) Read(ctx context.Context, req resource.ReadRequest, re
 		resp.Diagnostics.AddError("Error", err.Error())
 		return
 	}
-
+	if licenseResponse.StatusCode() == 404 {
+		resp.State.RemoveResource(ctx)
+		return
+	}
 	if licenseResponse.JSON200 == nil {
 		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Unexpected status: %s", licenseResponse.Status()))
 		return

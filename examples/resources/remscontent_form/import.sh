@@ -1,1 +1,0 @@
-terraform import remscontent_example.test "id-123"

@@ -7,7 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
+	"strconv"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -67,7 +67,7 @@ func (r *CategoryResource) Schema(ctx context.Context, req resource.SchemaReques
 				MarkdownDescription: "Display order for the category.",
 			},
 			"title": schema.StringAttribute{
-				Optional:            true,
+				Required:            true,
 				MarkdownDescription: "Category title.",
 			},
 		},
@@ -105,32 +105,26 @@ func (r *CategoryResource) Create(ctx context.Context, req resource.CreateReques
 		resp.Diagnostics.AddError("Error Adding Category Entry", fmt.Sprintf("status: %d, body: %s", addResp.StatusCode(), string(addResp.Body)))
 		return
 	}
-	categoryItem := addResp.JSON200
 
 	// The swagger doesn't have proper definition of the category
 	// Marshal then unmarshal to convert to the categoryCreateBody
-	type CategoryCreateBody struct {
-		Id      int64 `json:"category/id"`
-		Success bool  `json:"success"`
+	var categoryBody struct {
+		Success    bool  `json:"success"`
+		CategoryID int64 `json:"category/id"`
 	}
-	categoryBodyBytes, err := json.Marshal(categoryItem)
-	if err != nil {
-		resp.Diagnostics.AddError("Failed to marshal workflow body", err.Error())
-		return
-	}
-	var categoryBody CategoryCreateBody
-	if err := json.Unmarshal(categoryBodyBytes, &categoryBody); err != nil {
-		resp.Diagnostics.AddError("Failed to parse workflow body", err.Error())
+
+	if err := json.Unmarshal(addResp.Body, &categoryBody); err != nil {
+		fmt.Println("Error:", err)
 		return
 	}
 
 	if categoryBody.Success == false {
-		resp.Diagnostics.AddError("Error Adding Category Entry", "API returned success=false")
-
+		resp.Diagnostics.AddError("Error Adding Category Entry", fmt.Sprintf("API returned success=false. Full response: %s", string(addResp.Body)))
+		return
 	}
-	plan.Id = types.Int64Value(categoryBody.Id)
+	plan.Id = types.Int64Value(categoryBody.CategoryID)
 
-	tflog.Trace(ctx, "created a blacklist entry")
+	tflog.Trace(ctx, "created a category entry")
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -146,6 +140,11 @@ func (r *CategoryResource) Read(ctx context.Context, req resource.ReadRequest, r
 		resp.Diagnostics.AddError("Error Reading Category", readErr.Error())
 		return
 	}
+	if readResp.StatusCode() == 404 {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
 	if readResp.StatusCode() != 200 || readResp.JSON200 == nil {
 		resp.Diagnostics.AddError("Error Reading Category", fmt.Sprintf("status: %d, body: %s", readResp.StatusCode(), string(readResp.Body)))
 		return
@@ -153,8 +152,8 @@ func (r *CategoryResource) Read(ctx context.Context, req resource.ReadRequest, r
 	item := readResp.JSON200
 
 	state.Children = nil
-	categoryChildrenResp := *item.CategoryChildren
-	if len(categoryChildrenResp) > 0 {
+	if item.CategoryChildren != nil && len(*item.CategoryChildren) > 0 {
+		categoryChildrenResp := *item.CategoryChildren
 		child := make([]int64, len(categoryChildrenResp))
 		for i, v := range categoryChildrenResp {
 			child[i] = v.CategoryID
@@ -202,7 +201,7 @@ func (r *CategoryResource) Update(ctx context.Context, req resource.UpdateReques
 	}
 
 	if editResp.JSON200.Success == false {
-		resp.Diagnostics.AddError("Error Edit Category Entry", "API returned success=false")
+		resp.Diagnostics.AddError("Error Adding Category Entry", fmt.Sprintf("API returned success=false. Full response: %s", string(editResp.Body)))
 		return
 
 	}
@@ -234,17 +233,13 @@ func (r *CategoryResource) Delete(ctx context.Context, req resource.DeleteReques
 }
 
 func (r *CategoryResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	// Import ID format: "resource_ext_id|user_id"
-	parts := strings.SplitN(req.ID, "|", 2)
-	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+	idInt, err := strconv.ParseInt(req.ID, 10, 64)
+	if err != nil {
 		resp.Diagnostics.AddError(
 			"Invalid Import ID",
-			`Expected import ID in the format "resource_ext_id|user_id", e.g. "urn:example:dataset1|alice"`,
+			fmt.Sprintf("Unable to convert import ID to integer: %s", err),
 		)
 		return
 	}
-
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("resource_ext_id"), parts[0])...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("user_id"), parts[1])...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("comment"), "")...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), idInt)...)
 }

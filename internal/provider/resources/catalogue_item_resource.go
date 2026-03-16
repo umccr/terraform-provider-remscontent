@@ -197,6 +197,10 @@ func (r *CatalogueItemResource) Read(ctx context.Context, req resource.ReadReque
 		resp.Diagnostics.AddError("Error Reading Catalogue Item", readErr.Error())
 		return
 	}
+	if readResp.StatusCode() == 404 {
+		resp.State.RemoveResource(ctx)
+		return
+	}
 	if readResp.StatusCode() != 200 || readResp.JSON200 == nil {
 		resp.Diagnostics.AddError("Error Reading Catalogue Item", fmt.Sprintf("status: %d, body: %s", readResp.StatusCode(), string(readResp.Body)))
 		return

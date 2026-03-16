@@ -215,6 +215,7 @@ func (p *RemsContentProvider) Resources(ctx context.Context) []func() resource.R
 		resources.NewResourceResource,
 		resources.NewBlacklistResource,
 		resources.NewCatalogueItemResource,
+		resources.NewCategoryResource,
 	}
 }
 

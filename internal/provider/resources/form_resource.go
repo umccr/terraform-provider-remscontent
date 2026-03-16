@@ -276,6 +276,10 @@ func (r *FormResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		resp.Diagnostics.AddError("Error Reading Form", fromItemErr.Error())
 		return
 	}
+	if formItemResponse.StatusCode() == 404 {
+		resp.State.RemoveResource(ctx)
+		return
+	}
 	if formItemResponse.StatusCode() != 200 || formItemResponse.JSON200 == nil {
 		resp.Diagnostics.AddError("Error Reading Form", fmt.Sprintf("status: %d, body: %s", formItemResponse.StatusCode(), string(formItemResponse.Body)))
 		return
