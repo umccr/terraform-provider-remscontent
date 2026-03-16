@@ -39,7 +39,7 @@ func (d *ActorDataSource) Metadata(ctx context.Context, req datasource.MetadataR
 
 func (d *ActorDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Actor data source",
+		MarkdownDescription: "Actor data source. It only finds users who are available to be an actor in a workflow.",
 		Attributes: map[string]schema.Attribute{
 			"email": schema.StringAttribute{
 				MarkdownDescription: "The email of the logged in user for lookup that is available as handler",

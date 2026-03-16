@@ -5,9 +5,3 @@
 data "remscontent_blacklist_user" "user_1" {
   email = "user_1@email.com"
 }
-
-resource "remscontent_blacklist" "user1" {
-  resource_ext_id = resource.remscontent_resource.resource_1.resid # or use a literal resource id string
-  user_id         = data.remscontent_blacklist_user.user_1.id
-  comment         = "user_1 is bad"
-}

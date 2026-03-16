@@ -17,7 +17,7 @@ License data source
 
 ### Required
 
-- `title_en` (String) The title in english for the lookup
+- `title` (String) The title in english for the lookup
 
 ### Read-Only
 

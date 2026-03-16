@@ -11,8 +11,8 @@ import (
 	"strings"
 
 	"github.com/umccr/terraform-provider-remscontent/internal/provider/data_sources"
-	"github.com/umccr/terraform-provider-remscontent/internal/provider/functions"
 	"github.com/umccr/terraform-provider-remscontent/internal/provider/resources"
+	"github.com/umccr/terraform-provider-remscontent/internal/provider/shared"
 	remsclient "github.com/umccr/terraform-provider-remscontent/internal/rems-client"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -63,6 +63,7 @@ type RemsContentProviderModel struct {
 	Endpoint types.String `tfsdk:"endpoint"`
 	ApiUser  types.String `tfsdk:"api_user"`
 	ApiKey   types.String `tfsdk:"api_key"`
+	Language types.String `tfsdk:"language"`
 }
 
 func (p *RemsContentProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -86,6 +87,10 @@ func (p *RemsContentProvider) Schema(ctx context.Context, req provider.SchemaReq
 				Optional:            true,
 				Sensitive:           true,
 			},
+			"language": schema.StringAttribute{
+				MarkdownDescription: "Localization language key used for localized strings (e.g. \"en\", \"fi\"). Defaults to \"en\". Can also be set via REMS_LANGUAGE environment variable.",
+				Optional:            true,
+			},
 		},
 	}
 }
@@ -93,8 +98,9 @@ func (p *RemsContentProvider) Schema(ctx context.Context, req provider.SchemaReq
 func (p *RemsContentProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
 	if p.clientOverride != nil {
 		// To allow mock responses when testing
-		resp.ResourceData = p.clientOverride
-		resp.DataSourceData = p.clientOverride
+		cfg := &shared.ProviderConfig{Client: p.clientOverride, Language: "en"}
+		resp.ResourceData = cfg
+		resp.DataSourceData = cfg
 		return
 	}
 
@@ -137,6 +143,10 @@ func (p *RemsContentProvider) Configure(ctx context.Context, req provider.Config
 	endpoint := os.Getenv("REMS_ENDPOINT")
 	api_user := os.Getenv("REMS_API_USER")
 	api_key := os.Getenv("REMS_API_KEY")
+	language := os.Getenv("REMS_LANGUAGE")
+	if language == "" {
+		language = "en"
+	}
 
 	if !config.Endpoint.IsNull() {
 		endpoint = config.Endpoint.ValueString()
@@ -148,6 +158,10 @@ func (p *RemsContentProvider) Configure(ctx context.Context, req provider.Config
 
 	if !config.ApiKey.IsNull() {
 		api_key = config.ApiKey.ValueString()
+	}
+
+	if !config.Language.IsNull() {
+		language = config.Language.ValueString()
 	}
 
 	if endpoint == "" {
@@ -203,8 +217,12 @@ func (p *RemsContentProvider) Configure(ctx context.Context, req provider.Config
 		return
 	}
 
-	resp.DataSourceData = client
-	resp.ResourceData = client
+	cfg := &shared.ProviderConfig{
+		Client:   client,
+		Language: language,
+	}
+	resp.DataSourceData = cfg
+	resp.ResourceData = cfg
 }
 
 func (p *RemsContentProvider) Resources(ctx context.Context) []func() resource.Resource {
@@ -235,10 +253,7 @@ func (p *RemsContentProvider) DataSources(ctx context.Context) []func() datasour
 // :description :email :date :phone-number :table :header :texta :option :label :multiselect :ip-address :attachment :text
 
 func (p *RemsContentProvider) Functions(ctx context.Context) []func() function.Function {
-	return []func() function.Function{
-		functions.NewFormFieldHeaderFunction,
-		functions.NewFormFieldLabelFunction,
-	}
+	return []func() function.Function{}
 }
 
 func New(version string) func() provider.Provider {

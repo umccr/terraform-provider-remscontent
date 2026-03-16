@@ -6,11 +6,7 @@ terraform {
   }
 }
 
-provider "remscontent" {
-
-}
-
-
+provider "remscontent" {}
 
 resource "remscontent_license" "example_license" {
   title           = "Test License"
@@ -21,13 +17,9 @@ resource "remscontent_license" "example_license" {
   enabled         = true
 }
 
-
 resource "remscontent_license" "example_attachment_license" {
   title           = "Test Attachment License 2"
   organization_id = "Collaborative Centre for Genomic Cancer Medicine"
   type            = "attachment"
   path            = "./license-en.txt"
 }
-
-
-

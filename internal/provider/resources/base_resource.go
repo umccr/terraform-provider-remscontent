@@ -6,12 +6,14 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/umccr/terraform-provider-remscontent/internal/provider/shared"
 	remsclient "github.com/umccr/terraform-provider-remscontent/internal/rems-client"
 )
 
 // BaseRemsResource contains common fields and methods for all REMS resources
 type BaseRemsResource struct {
-	client *remsclient.ClientWithResponses
+	client   *remsclient.ClientWithResponses
+	language string
 }
 
 // Configure sets up the API client (called by all resources)
@@ -20,14 +22,15 @@ func (r *BaseRemsResource) Configure(ctx context.Context, req resource.Configure
 		return
 	}
 
-	client, ok := req.ProviderData.(*remsclient.ClientWithResponses)
+	cfg, ok := req.ProviderData.(*shared.ProviderConfig)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected *remsclient.ClientWithResponses, got: %T", req.ProviderData),
+			fmt.Sprintf("Expected *shared.ProviderConfig, got: %T", req.ProviderData),
 		)
 		return
 	}
 
-	r.client = client
+	r.client = cfg.Client
+	r.language = cfg.Language
 }

@@ -39,7 +39,7 @@ type ResourceResource struct {
 type ResourceResourceModel struct {
 	Id             types.Int64  `tfsdk:"id"`
 	OrganizationId types.String `tfsdk:"organization_id"`
-	Resid          types.String `tfsdk:"resid"`
+	ResourceExtId  types.String `tfsdk:"resource_ext_id"`
 	Licenses       *[]int64     `tfsdk:"licenses"`
 	Enabled        types.Bool   `tfsdk:"enabled"`
 	Archived       types.Bool   `tfsdk:"archived"`
@@ -68,7 +68,7 @@ func (r *ResourceResource) Schema(ctx context.Context, req resource.SchemaReques
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-			"resid": schema.StringAttribute{
+			"resource_ext_id": schema.StringAttribute{
 				Required:            true,
 				MarkdownDescription: "External resource identifier (e.g. a URI or dataset ID). Must be unique within the organization.",
 				PlanModifiers: []planmodifier.String{
@@ -115,7 +115,7 @@ func (r *ResourceResource) Create(ctx context.Context, req resource.CreateReques
 		Organization: remsclient.OrganizationID{
 			OrganizationID: plan.OrganizationId.ValueString(),
 		},
-		Resid:    plan.Resid.ValueString(),
+		Resid:    plan.ResourceExtId.ValueString(),
 		Licenses: licenses,
 	}
 
@@ -180,7 +180,7 @@ func (r *ResourceResource) Read(ctx context.Context, req resource.ReadRequest, r
 	}
 
 	item := readResp.JSON200
-	state.Resid = types.StringValue(item.Resid)
+	state.ResourceExtId = types.StringValue(item.Resid)
 	state.OrganizationId = types.StringValue(item.Organization.OrganizationID)
 	state.Enabled = types.BoolValue(item.Enabled)
 	state.Archived = types.BoolValue(item.Archived)

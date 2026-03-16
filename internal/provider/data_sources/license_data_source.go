@@ -30,8 +30,8 @@ type LicenseDataSource struct {
 
 // LicenseDataSourceModel describes the data source data model.
 type LicenseDataSourceModel struct {
-	Id      types.Int64  `tfsdk:"id"`
-	TitleEn types.String `tfsdk:"title_en"`
+	Id    types.Int64  `tfsdk:"id"`
+	Title types.String `tfsdk:"title"`
 }
 
 func (d *LicenseDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -47,7 +47,7 @@ func (d *LicenseDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 				MarkdownDescription: "License id",
 				Computed:            true,
 			},
-			"title_en": schema.StringAttribute{
+			"title": schema.StringAttribute{
 				MarkdownDescription: "The title in english for the lookup",
 				Required:            true,
 			},
@@ -76,11 +76,11 @@ func (d *LicenseDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	for _, license := range licenseResult {
 		if enLocalizations, ok := license.Localizations["en"]; ok {
 
-			if enLocalizations.Title == data.TitleEn.ValueString() {
+			if enLocalizations.Title == data.Title.ValueString() {
 				if matchedLicense != nil {
 					resp.Diagnostics.AddError(
 						"Multiple Licenses Found",
-						fmt.Sprintf("More than one license found with title_en: %s", data.TitleEn.ValueString()),
+						fmt.Sprintf("More than one license found with title: %s", data.Title.ValueString()),
 					)
 					return
 				}
@@ -93,7 +93,7 @@ func (d *LicenseDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	if matchedLicense == nil {
 		resp.Diagnostics.AddError(
 			"License Not Found",
-			fmt.Sprintf("No license found with title_en: %s", data.TitleEn.ValueString()),
+			fmt.Sprintf("No license found with title: %s", data.Title.ValueString()),
 		)
 		return
 	}

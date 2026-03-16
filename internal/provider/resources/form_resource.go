@@ -241,11 +241,9 @@ func (r *FormResource) Create(ctx context.Context, req resource.CreateRequest, r
 		Organization: remsclient.OrganizationID{
 			OrganizationID: plan.OrganizationId.ValueString(),
 		},
-		FormInternalName: plan.InternalName.ValueStringPointer(),
-		FormExternalTitle: &remsclient.LocalizedString{
-			"en": plan.ExternalTitle.ValueString(),
-		},
-		FormFields: fromFormFieldModels(plan.Fields),
+		FormInternalName:  plan.InternalName.ValueStringPointer(),
+		FormExternalTitle: shared.ToLocalizedString(plan.ExternalTitle, r.language),
+		FormFields:        fromFormFieldModels(plan.Fields, r.language),
 	}
 	formResponse, formErr := r.client.PostAPIFormsCreateWithResponse(ctx, nil, formCreateCommand)
 	if formErr != nil {
@@ -290,11 +288,11 @@ func (r *FormResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	state.Archived = types.BoolValue(formData.Archived)
 	state.InternalName = types.StringValue(formData.FormInternalName)
 	state.OrganizationId = types.StringValue(formData.Organization.OrganizationID)
-	state.ExternalTitle = shared.GetLocalizedString(&formData.FormExternalTitle)
+	state.ExternalTitle = shared.GetLocalizedString(&formData.FormExternalTitle, r.language)
 
 	state.Fields = []FormFieldResourceModel{}
 	for _, formItem := range formData.FormFields {
-		state.Fields = append(state.Fields, toFormFieldModel(formItem))
+		state.Fields = append(state.Fields, toFormFieldModel(formItem, r.language))
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
@@ -331,8 +329,8 @@ func (r *FormResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		},
 		FormInternalName:  plan.InternalName.ValueStringPointer(),
 		FormID:            plan.Id.ValueInt64(),
-		FormExternalTitle: shared.ToLocalizedString(plan.ExternalTitle),
-		FormFields:        fromFormFieldModels(plan.Fields),
+		FormExternalTitle: shared.ToLocalizedString(plan.ExternalTitle, r.language),
+		FormFields:        fromFormFieldModels(plan.Fields, r.language),
 	}
 
 	updateResponse, updateErr := r.client.PutAPIFormsEditWithResponse(ctx, nil, formUpdateCommand)
@@ -387,7 +385,7 @@ func (r *FormResource) Update(ctx context.Context, req resource.UpdateRequest, r
 
 	plan.Fields = []FormFieldResourceModel{}
 	for _, formItem := range formItemResponse.JSON200.FormFields {
-		plan.Fields = append(plan.Fields, toFormFieldModel(formItem))
+		plan.Fields = append(plan.Fields, toFormFieldModel(formItem, r.language))
 	}
 
 	// Save updated data into Terraform state
@@ -575,7 +573,7 @@ func (r *FormResource) ValidateConfig(ctx context.Context, req resource.Validate
 }
 
 // Helper func
-func toKeyLabelOptions(item *[]remsclient.FormTemplateFieldsOptions) *[]KeyLabelModel {
+func toKeyLabelOptions(item *[]remsclient.FormTemplateFieldsOptions, language string) *[]KeyLabelModel {
 	if item == nil {
 		return nil
 	}
@@ -583,13 +581,13 @@ func toKeyLabelOptions(item *[]remsclient.FormTemplateFieldsOptions) *[]KeyLabel
 	for _, opt := range *item {
 		opts = append(opts, KeyLabelModel{
 			Key:   types.StringValue(opt.Key),
-			Label: shared.GetLocalizedString(&opt.Label),
+			Label: shared.GetLocalizedString(&opt.Label, language),
 		})
 	}
 	return &opts
 }
 
-func toKeyLabelColumns(item *[]remsclient.FormTemplateFieldsColumns) *[]KeyLabelModel {
+func toKeyLabelColumns(item *[]remsclient.FormTemplateFieldsColumns, language string) *[]KeyLabelModel {
 	if item == nil {
 		return nil
 	}
@@ -597,7 +595,7 @@ func toKeyLabelColumns(item *[]remsclient.FormTemplateFieldsColumns) *[]KeyLabel
 	for _, opt := range *item {
 		opts = append(opts, KeyLabelModel{
 			Key:   types.StringValue(opt.Key),
-			Label: shared.GetLocalizedString(&opt.Label),
+			Label: shared.GetLocalizedString(&opt.Label, language),
 		})
 	}
 	return &opts
@@ -620,24 +618,24 @@ func toVisibilityModel(item *remsclient.FormTemplateFieldsVisibility) *Visibilit
 	}
 }
 
-func toFormFieldModel(formItem remsclient.FieldTemplate) FormFieldResourceModel {
+func toFormFieldModel(formItem remsclient.FieldTemplate, language string) FormFieldResourceModel {
 
 	return FormFieldResourceModel{
 		Id:          types.StringValue(formItem.FieldID),
 		Type:        types.StringValue(string(formItem.FieldType)),
-		Title:       shared.GetLocalizedString(&formItem.FieldTitle),
-		Info:        shared.GetLocalizedString(formItem.FieldInfoText),
-		Placeholder: shared.GetLocalizedString(formItem.FieldPlaceholder),
+		Title:       shared.GetLocalizedString(&formItem.FieldTitle, language),
+		Info:        shared.GetLocalizedString(formItem.FieldInfoText, language),
+		Placeholder: shared.GetLocalizedString(formItem.FieldPlaceholder, language),
 		Optional:    types.BoolValue(formItem.FieldOptional),
-		Options:     toKeyLabelOptions(formItem.FieldOptions),
-		Columns:     toKeyLabelColumns(formItem.FieldColumns),
+		Options:     toKeyLabelOptions(formItem.FieldOptions, language),
+		Columns:     toKeyLabelColumns(formItem.FieldColumns, language),
 		MaxLength:   types.Int64PointerValue(formItem.FieldMaxLength),
 		Privacy:     types.StringPointerValue((*string)(formItem.FieldPrivacy)),
 		Visibility:  toVisibilityModel(formItem.FieldVisibility),
 	}
 }
 
-func fromKeyLabelOptions(items *[]KeyLabelModel) *[]remsclient.CreateFormCommandFieldsOptions {
+func fromKeyLabelOptions(items *[]KeyLabelModel, language string) *[]remsclient.CreateFormCommandFieldsOptions {
 	if items == nil {
 		return nil
 	}
@@ -645,13 +643,13 @@ func fromKeyLabelOptions(items *[]KeyLabelModel) *[]remsclient.CreateFormCommand
 	for _, item := range *items {
 		opts = append(opts, remsclient.CreateFormCommandFieldsOptions{
 			Key:   item.Key.ValueString(),
-			Label: *shared.ToLocalizedString(item.Label),
+			Label: *shared.ToLocalizedString(item.Label, language),
 		})
 	}
 	return &opts
 }
 
-func fromKeyLabelColumns(items *[]KeyLabelModel) *[]remsclient.CreateFormCommandFieldsColumns {
+func fromKeyLabelColumns(items *[]KeyLabelModel, language string) *[]remsclient.CreateFormCommandFieldsColumns {
 	if items == nil {
 		return nil
 	}
@@ -659,7 +657,7 @@ func fromKeyLabelColumns(items *[]KeyLabelModel) *[]remsclient.CreateFormCommand
 	for _, item := range *items {
 		cols = append(cols, remsclient.CreateFormCommandFieldsColumns{
 			Key:   item.Key.ValueString(),
-			Label: *shared.ToLocalizedString(item.Label),
+			Label: *shared.ToLocalizedString(item.Label, language),
 		})
 	}
 	return &cols
@@ -684,7 +682,7 @@ func fromVisibilityModel(item *VisibilityModel) *remsclient.CreateFormCommandFie
 	}
 }
 
-func fromFormFieldModels(items []FormFieldResourceModel) []remsclient.NewFieldTemplate {
+func fromFormFieldModels(items []FormFieldResourceModel, language string) []remsclient.NewFieldTemplate {
 	fields := make([]remsclient.NewFieldTemplate, 0, len(items))
 	for _, item := range items {
 
@@ -697,12 +695,12 @@ func fromFormFieldModels(items []FormFieldResourceModel) []remsclient.NewFieldTe
 		fields = append(fields, remsclient.NewFieldTemplate{
 			FieldID:          item.Id.ValueStringPointer(),
 			FieldType:        remsclient.NewFieldTemplateFieldType(item.Type.ValueString()),
-			FieldTitle:       *shared.ToLocalizedString(item.Title),
+			FieldTitle:       *shared.ToLocalizedString(item.Title, language),
 			FieldOptional:    item.Optional.ValueBool(),
-			FieldPlaceholder: shared.ToLocalizedString(item.Placeholder),
-			FieldInfoText:    shared.ToLocalizedString(item.Info),
-			FieldOptions:     fromKeyLabelOptions(item.Options),
-			FieldColumns:     fromKeyLabelColumns(item.Columns),
+			FieldPlaceholder: shared.ToLocalizedString(item.Placeholder, language),
+			FieldInfoText:    shared.ToLocalizedString(item.Info, language),
+			FieldOptions:     fromKeyLabelOptions(item.Options, language),
+			FieldColumns:     fromKeyLabelColumns(item.Columns, language),
 			FieldMaxLength:   item.MaxLength.ValueInt64Pointer(),
 			FieldPrivacy:     fieldPrivacy,
 			FieldVisibility:  fromVisibilityModel(item.Visibility),

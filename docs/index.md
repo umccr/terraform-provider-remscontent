@@ -46,3 +46,4 @@ resource "remscontent_form" "xyz_form" {
 - `api_key` (String, Sensitive) REMS API key
 - `api_user` (String) REMS API user
 - `endpoint` (String) REMS instance endpoint (DNS name only, not URI)
+- `language` (String) Localization language key used for localized strings (e.g. "en", "fi"). Defaults to "en". Can also be set via REMS_LANGUAGE environment variable.

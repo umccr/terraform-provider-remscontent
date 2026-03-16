@@ -5,24 +5,29 @@ import (
 	remsclient "github.com/umccr/terraform-provider-remscontent/internal/rems-client"
 )
 
-func GetLocalizedString(m *remsclient.LocalizedString) types.String {
+// ProviderConfig is passed as ProviderData to all resources and data sources.
+type ProviderConfig struct {
+	Client   *remsclient.ClientWithResponses
+	Language string // e.g. "en", "fr"
+}
+
+func GetLocalizedString(m *remsclient.LocalizedString, language string) types.String {
 	if m == nil {
 		return types.StringNull()
 	}
-	val, ok := (*m)["en"]
+	val, ok := (*m)[language]
 	if !ok {
 		return types.StringNull()
 	}
 	return types.StringValue(val)
 }
 
-func ToLocalizedString(s types.String) *remsclient.LocalizedString {
+func ToLocalizedString(s types.String, language string) *remsclient.LocalizedString {
 	if s.IsNull() || s.IsUnknown() {
 		return nil
 	}
 
 	return &remsclient.LocalizedString{
-		"en": s.ValueString(),
+		language: s.ValueString(),
 	}
-
 }

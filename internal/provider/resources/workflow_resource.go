@@ -223,7 +223,7 @@ func (r *WorkflowResource) Create(ctx context.Context, req resource.CreateReques
 		for i, v := range *plan.ProcessingStates {
 			s[i] = remsclient.ProcessingState{
 				ProcessingStateValue: v.Value.ValueString(),
-				ProcessingStateTitle: shared.ToLocalizedString(v.Title),
+				ProcessingStateTitle: shared.ToLocalizedString(v.Title, r.language),
 			}
 		}
 		processingStatesCmd = &s
@@ -414,7 +414,7 @@ func (r *WorkflowResource) Update(ctx context.Context, req resource.UpdateReques
 		for i, v := range *plan.ProcessingStates {
 			s[i] = remsclient.ProcessingState{
 				ProcessingStateValue: v.Value.ValueString(),
-				ProcessingStateTitle: shared.ToLocalizedString(v.Title),
+				ProcessingStateTitle: shared.ToLocalizedString(v.Title, r.language),
 			}
 		}
 		processingStatesCmd = &s

@@ -63,7 +63,7 @@ func TestResourceResource_CreateMinimal(t *testing.T) {
 				Config: `
 provider "remscontent" {}
 resource "remscontent_resource" "test" {
-  resid           = "urn:example:dataset1"
+  resource_ext_id          = "urn:example:dataset1"
   organization_id = "test-org"
 }`,
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -110,7 +110,7 @@ func TestResourceResource_CreateWithLicenses(t *testing.T) {
 				Config: `
 provider "remscontent" {}
 resource "remscontent_resource" "test" {
-  resid           = "urn:example:dataset1"
+  resource_ext_id          = "urn:example:dataset1"
   organization_id = "test-org"
   licenses        = [7, 8]
 }`,
@@ -145,7 +145,7 @@ func TestResourceResource_Disabled(t *testing.T) {
 				Config: `
 provider "remscontent" {}
 resource "remscontent_resource" "test" {
-  resid           = "urn:example:dataset1"
+  resource_ext_id          = "urn:example:dataset1"
   organization_id = "test-org"
   enabled         = false
 }`,
@@ -204,7 +204,7 @@ func TestResourceResource_UpdateEnabledArchived(t *testing.T) {
 				Config: `
 provider "remscontent" {}
 resource "remscontent_resource" "test" {
-  resid           = "urn:example:dataset1"
+  resource_ext_id          = "urn:example:dataset1"
   organization_id = "test-org"
   enabled         = true
   archived        = false
@@ -218,7 +218,7 @@ resource "remscontent_resource" "test" {
 				Config: `
 provider "remscontent" {}
 resource "remscontent_resource" "test" {
-  resid           = "urn:example:dataset1"
+  resource_ext_id          = "urn:example:dataset1"
   organization_id = "test-org"
   enabled         = false
   archived        = true
@@ -256,7 +256,7 @@ func TestResourceResource_ImportState(t *testing.T) {
 				Config: `
 provider "remscontent" {}
 resource "remscontent_resource" "test" {
-  resid           = "urn:example:dataset1"
+  resource_ext_id          = "urn:example:dataset1"
   organization_id = "test-org"
   licenses        = [7]
 }`,

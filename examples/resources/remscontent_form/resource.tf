@@ -6,10 +6,7 @@ terraform {
   }
 }
 
-provider "remscontent" {
-
-}
-
+provider "remscontent" {}
 
 resource "remscontent_form" "test_form" {
   internal_name   = "Test Form"
@@ -22,7 +19,6 @@ resource "remscontent_form" "test_form" {
       "type" : "text",
       "optional" : false
     },
-
     {
       "title" : "ph.number",
       "type" : "phone-number",
@@ -31,7 +27,6 @@ resource "remscontent_form" "test_form" {
       "title" : "Email",
       "type" : "email"
     },
-
     {
       "title" : "Date",
       "type" : "date"
@@ -61,6 +56,4 @@ resource "remscontent_form" "test_form" {
       }
     },
   ]
-
 }
-

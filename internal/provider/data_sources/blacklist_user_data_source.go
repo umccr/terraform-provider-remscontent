@@ -39,7 +39,7 @@ func (d *BlacklistUserDataSource) Metadata(ctx context.Context, req datasource.M
 
 func (d *BlacklistUserDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "BlacklistUser data source",
+		MarkdownDescription: "It only finds users who are available to be blacklisted (not currently blacklisted).",
 		Attributes: map[string]schema.Attribute{
 			"email": schema.StringAttribute{
 				MarkdownDescription: "The email of the logged in user for lookup that is available as handler",

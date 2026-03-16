@@ -12,6 +12,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/umccr/terraform-provider-remscontent/internal/provider/shared"
@@ -52,6 +54,9 @@ func (r *CategoryResource) Schema(ctx context.Context, req resource.SchemaReques
 			"id": schema.Int64Attribute{
 				Computed:            true,
 				MarkdownDescription: "Category identifier",
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"children": schema.ListAttribute{
 				Optional:            true,
@@ -91,9 +96,9 @@ func (r *CategoryResource) Create(ctx context.Context, req resource.CreateReques
 	}
 	cmd := remsclient.CreateCategoryCommand{
 		CategoryChildren:     categoriesChildren,
-		CategoryDescription:  shared.ToLocalizedString(plan.Description),
+		CategoryDescription:  shared.ToLocalizedString(plan.Description, r.language),
 		CategoryDisplayOrder: plan.DisplayOrder.ValueInt64Pointer(),
-		CategoryTitle:        *shared.ToLocalizedString(plan.Title),
+		CategoryTitle:        *shared.ToLocalizedString(plan.Title, r.language),
 	}
 
 	addResp, addErr := r.client.PostAPICategoriesCreateWithResponse(ctx, nil, cmd)
@@ -161,9 +166,9 @@ func (r *CategoryResource) Read(ctx context.Context, req resource.ReadRequest, r
 		state.Children = &child
 	}
 
-	state.Description = shared.GetLocalizedString(item.CategoryDescription)
+	state.Description = shared.GetLocalizedString(item.CategoryDescription, r.language)
 	state.DisplayOrder = types.Int64PointerValue(item.CategoryDisplayOrder)
-	state.Title = shared.GetLocalizedString(&item.CategoryTitle)
+	state.Title = shared.GetLocalizedString(&item.CategoryTitle, r.language)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -184,10 +189,11 @@ func (r *CategoryResource) Update(ctx context.Context, req resource.UpdateReques
 		categoriesChildren = &s
 	}
 	cmd := remsclient.UpdateCategoryCommand{
+		CategoryID:           plan.Id.ValueInt64(),
 		CategoryChildren:     categoriesChildren,
-		CategoryDescription:  shared.ToLocalizedString(plan.Description),
+		CategoryDescription:  shared.ToLocalizedString(plan.Description, r.language),
 		CategoryDisplayOrder: plan.DisplayOrder.ValueInt64Pointer(),
-		CategoryTitle:        *shared.ToLocalizedString(plan.Title),
+		CategoryTitle:        *shared.ToLocalizedString(plan.Title, r.language),
 	}
 
 	editResp, editErr := r.client.PutAPICategoriesEditWithResponse(ctx, nil, cmd)
