@@ -8,6 +8,7 @@ package tools
 import (
 	_ "github.com/hashicorp/copywrite"
 	_ "github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs"
+	_ "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen"
 )
 
 // Format Terraform code for use in documentation.
@@ -16,4 +17,4 @@ import (
 //go:generate terraform fmt -recursive ../examples/
 
 // Generate documentation.
-//go:generate go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs generate --provider-dir .. -provider-name rems
+//go:generate go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs generate --provider-dir .. -provider-name remscontent
