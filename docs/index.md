@@ -12,29 +12,14 @@ description: |-
 ## Example Usage
 
 ```terraform
-terraform {
-  required_providers {
-    remscontent = {
-      source = "registry.terraform.io/umccr/remscontent"
-    }
-  }
-}
-
+# Provider configuration using explicit values.
+# All attributes can alternatively be set via environment variables:
+#   REMS_ENDPOINT, REMS_API_USER, REMS_API_KEY, REMS_LANGUAGE
 provider "remscontent" {
-
-  # should organization be set at the provider level rather than included in every resource??
-  # organization_id = "Collaborative Centre for Genomic Cancer Medicine"
-}
-
-resource "remscontent_form" "xyz_form" {
-  organization_id = "Collaborative Centre for Genomic Cancer Medicine"
-  title           = "Access to XYZ data"
-
-  fields = [
-    provider::remscontent::form_field_header("hdr_applicant", { en : "Applicant", fi : "Blah" }),
-    provider::remscontent::form_field_header("hdr_purpose", { en : "Purpose" }),
-    // provider::remscontent::form_field_label({ en : "Yes" }),
-  ]
+  endpoint = "rems.example.org" # DNS name only, no https://
+  api_user = "admin@example.org"
+  api_key  = "my-secret-api-key"
+  language = "en" # Localization language for all resources (e.g. "en", "fi")
 }
 ```
 
