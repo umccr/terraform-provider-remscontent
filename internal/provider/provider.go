@@ -247,6 +247,11 @@ func (p *RemsContentProvider) DataSources(ctx context.Context) []func() datasour
 		data_sources.NewLicenseDataSource,
 		data_sources.NewActorDataSource,
 		data_sources.NewBlacklistUserDataSource,
+		data_sources.NewCatalogueItemDataSource,
+		data_sources.NewCategoryDataSource,
+		data_sources.NewFormDataSource,
+		data_sources.NewResourceDataSource,
+		data_sources.NewWorkflowDataSource,
 	}
 }
 

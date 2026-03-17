@@ -215,10 +215,19 @@ func (r *CatalogueItemResource) Read(ctx context.Context, req resource.ReadReque
 	state.FormId = types.Int64Value(*item.Formid)
 
 	state.Localizations = &CatalogueItemLocalizationModel{
-		Title:   types.StringValue(item.Localizations["en"].Title),
-		Infourl: types.StringPointerValue(item.Localizations["en"].Infourl),
+		Title:   types.StringValue(item.Localizations[r.language].Title),
+		Infourl: types.StringPointerValue(item.Localizations[r.language].Infourl),
 	}
-	// state.CategoryIds = nil
+
+	state.CategoryIds = nil
+
+	if item.Categories != nil && len(*item.Categories) > 0 {
+		ids := make([]types.Int64, len(*item.Categories))
+		for i, c := range *item.Categories {
+			ids[i] = types.Int64Value(c.CategoryID)
+		}
+		state.CategoryIds = &ids
+	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

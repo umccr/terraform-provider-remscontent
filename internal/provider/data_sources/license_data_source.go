@@ -71,6 +71,10 @@ func (d *LicenseDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		resp.Diagnostics.AddError("Error reading license", err.Error())
 		return
 	}
+	if licenseResult == nil {
+		resp.Diagnostics.AddError("No license found", "The license list is nil.")
+		return
+	}
 
 	var matchedLicense *remsclient.License
 	for _, license := range licenseResult {
