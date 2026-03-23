@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package data_sources
 
 import (
@@ -102,7 +99,7 @@ func (d *LicenseDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		return
 	}
 
-	data.Id = types.Int64Value(int64(matchedLicense.ID))
+	data.Id = types.Int64Value(matchedLicense.ID)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

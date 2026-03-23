@@ -5,10 +5,18 @@ terraform {
     }
   }
 }
-
-provider "remscontent" {}
-
 variable "email" {}
+variable "REMS_ENDPOINT" {}
+variable "REMS_API_KEY" {}
+variable "REMS_API_USER" {}
+
+provider "remscontent" {
+  endpoint = var.REMS_ENDPOINT # DNS name only, no https://
+  api_user = var.REMS_API_USER
+  api_key  = var.REMS_API_KEY
+  language = "en" # Localization language for all resources (e.g. "en", "fi")
+}
+
 
 data "remscontent_blacklist_user" "user_1" {
   email = var.email

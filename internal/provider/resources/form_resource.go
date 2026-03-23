@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package resources
 
 import (
@@ -15,7 +12,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -81,12 +77,8 @@ type FormFieldResourceModel struct {
 var fieldSchema = schema.NestedAttributeObject{
 	Attributes: map[string]schema.Attribute{
 		"id": schema.StringAttribute{
-			Computed:            true,
-			Optional:            true,
-			MarkdownDescription: "Field identifier",
-			PlanModifiers: []planmodifier.String{
-				stringplanmodifier.UseStateForUnknown(),
-			},
+			Required:            true,
+			MarkdownDescription: "Field identifier. Must be unique within the form. Any string is allowed; the simplest approach is to use incrementing numbers (e.g., 1, 2, 3), but any unique string is valid.",
 		},
 		"type": schema.StringAttribute{
 			Required: true,
@@ -257,7 +249,6 @@ func (r *FormResource) Create(ctx context.Context, req resource.CreateRequest, r
 
 	plan.Id = types.Int64Value(*formResponse.JSON200.ID)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
-
 }
 
 func (r *FormResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -319,7 +310,7 @@ func (r *FormResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 	if !isEditable.JSON200.Success {
-		resp.Diagnostics.AddError("Unable to edit given form id: ", string(isEditable.Body))
+		resp.Diagnostics.AddError("Form is not editable. Details:", string(isEditable.Body))
 		return
 	}
 
@@ -338,7 +329,7 @@ func (r *FormResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		resp.Diagnostics.AddError("Error Updating Form", updateErr.Error())
 		return
 	}
-	if isEditable.StatusCode() != 200 || isEditable.JSON200 == nil {
+	if updateResponse.StatusCode() != 200 || updateResponse.JSON200 == nil {
 		resp.Diagnostics.AddError("Error Updating Form", fmt.Sprintf("status: %d, body: %s", updateResponse.StatusCode(), string(updateResponse.Body)))
 		return
 	}
@@ -371,21 +362,6 @@ func (r *FormResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	if enabledResponse.StatusCode() != 200 || enabledResponse.JSON200 == nil {
 		resp.Diagnostics.AddError("Error Enabled/Disabled Form", fmt.Sprintf("status: %d, body: %s", enabledResponse.StatusCode(), string(enabledResponse.Body)))
 		return
-	}
-
-	formItemResponse, formItemErr := r.client.GetAPIFormsFormIDWithResponse(ctx, formID, nil)
-	if formItemErr != nil {
-		resp.Diagnostics.AddError("Error Retrieving Form", formItemErr.Error())
-		return
-	}
-	if formItemResponse.StatusCode() != 200 || formItemResponse.JSON200 == nil {
-		resp.Diagnostics.AddError("Error Retrieving Form", fmt.Sprintf("status: %d, body: %s", formItemResponse.StatusCode(), string(formItemResponse.Body)))
-		return
-	}
-
-	plan.Fields = []FormFieldResourceModel{}
-	for _, formItem := range formItemResponse.JSON200.FormFields {
-		plan.Fields = append(plan.Fields, toFormFieldModel(formItem, r.language))
 	}
 
 	// Save updated data into Terraform state
@@ -447,8 +423,19 @@ func (r *FormResource) ValidateConfig(ctx context.Context, req resource.Validate
 	// - Each value in has_value is a valid option key for the referenced field.
 	// Used for cross-field validation in form configuration.
 	fieldOptionKeys := make(map[string]map[string]bool, len(data.Fields))
-	for _, f := range data.Fields {
+	for i, f := range data.Fields {
 		if !f.Id.IsNull() && !f.Id.IsUnknown() {
+			fieldId := f.Id.ValueString()
+
+			// Check for duplicate IDs
+			if _, duplicate := fieldOptionKeys[fieldId]; duplicate {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("fields").AtListIndex(i).AtName("id"),
+					"Duplicate field ID",
+					fmt.Sprintf("Field ID `%s` must be unique within the form.", fieldId),
+				)
+			}
+
 			keys := make(map[string]bool)
 			if f.Options != nil {
 				for _, opt := range *f.Options {
@@ -564,15 +551,9 @@ func (r *FormResource) ValidateConfig(ctx context.Context, req resource.Validate
 		}
 	}
 
-	// check for visibility whether the value complies with other fields
-
-	// regular: title, text, texta, date, email, phone, ip
-	// optons: options, multi-select, table
-	// no value: label, header
-
 }
 
-// Helper func
+// Helper function.
 func toKeyLabelOptions(item *[]remsclient.FormTemplateFieldsOptions, language string) *[]KeyLabelModel {
 	if item == nil {
 		return nil

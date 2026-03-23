@@ -6,7 +6,42 @@ terraform {
   }
 }
 
-provider "remscontent" {}
+variable "email" {}
+variable "REMS_ENDPOINT" {}
+variable "REMS_API_KEY" {}
+variable "REMS_API_USER" {}
+
+provider "remscontent" {
+  endpoint = var.REMS_ENDPOINT # DNS name only, no https://
+  api_user = var.REMS_API_USER
+  api_key  = var.REMS_API_KEY
+  language = "en" # Localization language for all resources (e.g. "en", "fi")
+}
+
+
+resource "remscontent_form" "example-001" {
+  internal_name   = "example-001"
+  external_title  = "Example DEMO"
+  organization_id = "Collaborative Centre for Genomic Cancer Medicine"
+
+  fields = [
+    {
+      "id" : "1"
+      "title" : "Title",
+      "type" : "text",
+      "optional" : false
+    },
+    # {
+    #   "title" : "Email",
+    #   "type" : "email"
+    # },
+    # {
+    #   "title" : "Description",
+    #   "type" : "texta"
+    # },
+  ]
+}
+
 
 resource "remscontent_form" "test_form" {
   internal_name   = "Test Form"
@@ -15,19 +50,23 @@ resource "remscontent_form" "test_form" {
 
   fields = [
     {
+      "id" : "fld1"
       "title" : "Title",
       "type" : "text",
       "optional" : false
     },
     {
+      "id" : "fld2"
       "title" : "ph.number",
       "type" : "phone-number",
     },
     {
+      "id" : "fld3"
       "title" : "Email",
       "type" : "email"
     },
     {
+      "id" : "fld4"
       "title" : "Date",
       "type" : "date"
     },
@@ -47,6 +86,7 @@ resource "remscontent_form" "test_form" {
       ]
     },
     {
+      "id" : "fld6",
       "title" : "Attachment",
       "type" : "attachment",
       "visibility" : {

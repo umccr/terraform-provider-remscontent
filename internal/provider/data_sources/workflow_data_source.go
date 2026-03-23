@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package data_sources
 
 import (
@@ -94,7 +91,7 @@ func (d *WorkflowDataSource) Read(ctx context.Context, req datasource.ReadReques
 		}
 	}
 
-	data.Id = types.Int64Value(int64(matchedWorkflow.ID))
+	data.Id = types.Int64Value(matchedWorkflow.ID)
 
 	// Save to Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

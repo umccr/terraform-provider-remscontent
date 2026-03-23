@@ -1,17 +1,12 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package data_sources
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -60,21 +55,15 @@ func (d *OrganizationDataSource) Read(ctx context.Context, req datasource.ReadRe
 		return
 	}
 
-	orgsResult, err := d.client.GetAPIOrganizationsOrganizationIDWithResponse(ctx, data.Id.ValueString(), nil)
-
+	organizationResponse, err := d.client.GetAPIOrganizationsOrganizationIDWithResponse(ctx, data.Id.ValueString(), nil)
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading organization", err.Error())
 		return
 	}
+	if organizationResponse.StatusCode() != 200 || organizationResponse.JSON200 == nil {
+		resp.Diagnostics.AddError("Error fetching organization list", fmt.Sprintf("status: %d, body: %s", organizationResponse.StatusCode(), string(organizationResponse.Body)))
+		return
+	}
 
-	jsonBytes, err := json.MarshalIndent(orgsResult, "", "  ")
-	tflog.Info(ctx, fmt.Sprintf("OUTPUT - orgsResult:\n%s", string(jsonBytes)))
-
-	// // 3. Map API response → Model
-	// data.Name = types.StringValue(*orgResult.OrganizationId.OrganizationId)
-	// data.Archived = types.BoolValue(*orgResult.Archived)
-	// data.Enabled = types.BoolValue(*orgResult.Enabled)
-
-	// 4. Save to Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

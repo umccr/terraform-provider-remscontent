@@ -10,13 +10,13 @@ import (
 	remsclient "github.com/umccr/terraform-provider-remscontent/internal/rems-client"
 )
 
-// BaseRemsResource contains common fields and methods for all REMS resources
+// BaseRemsResource contains common fields and methods for all REMS resources.
 type BaseRemsResource struct {
 	client   *remsclient.ClientWithResponses
 	language string
 }
 
-// Configure sets up the API client (called by all resources)
+// Configure sets up the API client (called by all resources).
 func (r *BaseRemsResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
 		return

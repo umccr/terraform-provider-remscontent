@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package resources
 
 import (
@@ -99,7 +96,7 @@ func (r *BlacklistResource) Create(ctx context.Context, req resource.CreateReque
 		resp.Diagnostics.AddError("Error Adding Blacklist Entry", fmt.Sprintf("status: %d, body: %s", addResp.StatusCode(), string(addResp.Body)))
 		return
 	}
-	if addResp.JSON200.Success == false {
+	if !addResp.JSON200.Success {
 		resp.Diagnostics.AddError("Error Adding Blacklist Entry", "API returned success=false")
 		return
 	}
@@ -143,7 +140,7 @@ func (r *BlacklistResource) Read(ctx context.Context, req resource.ReadRequest, 
 
 	// it shouldn't return more than 1
 	if len(*readResp.JSON200) != 1 {
-		resp.Diagnostics.AddError("Unexpected blacklist", fmt.Sprintf("Error contain more than 1 blacklist "))
+		resp.Diagnostics.AddError("Unexpected blacklist", "Error contain more than 1 blacklist ")
 		return
 	}
 

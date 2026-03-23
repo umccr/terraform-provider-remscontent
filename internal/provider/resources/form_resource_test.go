@@ -24,7 +24,7 @@ resource "remscontent_form" "test" {
   external_title  = "Test"
   organization_id = "test-org"
   fields = [
-    { title = "Choose one", type = "option" }
+    { id = "1", title = "Choose one", type = "option" }
   ]
 }`,
 				ExpectError: regexp.MustCompile("`options` is required when field type is `option`"),
@@ -44,7 +44,7 @@ resource "remscontent_form" "test" {
   external_title  = "Test"
   organization_id = "test-org"
   fields = [
-    { title = "Pick many", type = "multiselect" }
+    { id = "1", title = "Pick many", type = "multiselect" }
   ]
 }`,
 				ExpectError: regexp.MustCompile("`options` is required when field type is `multiselect`"),
@@ -65,6 +65,7 @@ resource "remscontent_form" "test" {
   organization_id = "test-org"
   fields = [
     {
+      id    = "1"
       title = "Name"
       type  = "text"
       options = [{ key = "a", label = "A" }]
@@ -88,7 +89,7 @@ resource "remscontent_form" "test" {
   external_title  = "Test"
   organization_id = "test-org"
   fields = [
-    { title = "Grid", type = "table" }
+    { id = "1", title = "Grid", type = "table" }
   ]
 }`,
 				ExpectError: regexp.MustCompile("`columns` is required when field type is `table`"),
@@ -109,6 +110,7 @@ resource "remscontent_form" "test" {
   organization_id = "test-org"
   fields = [
     {
+      id      = "1"
       title   = "Name"
       type    = "text"
       columns = [{ key = "c1", label = "Col 1" }]
@@ -133,6 +135,7 @@ resource "remscontent_form" "test" {
   organization_id = "test-org"
   fields = [
     {
+      id    = "1"
       title = "Name"
       type  = "text"
       visibility = {
@@ -169,6 +172,7 @@ resource "remscontent_form" "test" {
       ]
     },
     {
+      id    = "q2"
       title = "File"
       type  = "attachment"
       visibility = {
@@ -196,6 +200,7 @@ resource "remscontent_form" "test" {
   organization_id = "test-org"
   fields = [
     {
+      id    = "1"
       title = "File"
       type  = "attachment"
       visibility = {
@@ -233,6 +238,7 @@ resource "remscontent_form" "test" {
       ]
     },
     {
+      id    = "1"
       title = "File"
       type  = "attachment"
       visibility = {
@@ -261,6 +267,7 @@ resource "remscontent_form" "test" {
   organization_id = "test-org"
   fields = [
     {
+      id    = "1"
       title = "Name"
       type  = "text"
       visibility = {
@@ -276,8 +283,8 @@ resource "remscontent_form" "test" {
 	})
 }
 
-// Valid config — PlanOnly so it never reaches Apply (no real HTTP call needed)
-func TestUnitFormResource_ValidConfig_Basic(t *testing.T) {
+// Valid config — PlanOnly so it never reaches Apply (no real HTTP call needed).
+func TestUnitFormResource_ValidConfig_DuplicateFieldId(t *testing.T) {
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
@@ -288,13 +295,11 @@ resource "remscontent_form" "test" {
   external_title  = "My Form"
   organization_id = "test-org"
   fields = [
-    { title = "Full Name", type = "text" },
-    { title = "Email",     type = "email" },
-    { title = "Notes",     type = "texta", optional = true },
+    { id = "1", title = "A", type = "text" },
+    { id = "1", title = "B", type = "email" },
   ]
 }`,
-				PlanOnly:           true,
-				ExpectNonEmptyPlan: true,
+				ExpectError: regexp.MustCompile("Field ID `1` must be unique within the form."),
 			},
 		},
 	})
@@ -321,6 +326,7 @@ resource "remscontent_form" "test" {
       ]
     },
     {
+      id    = "attachment-file"
       title = "Attachment"
       type  = "attachment"
       visibility = {
@@ -329,6 +335,29 @@ resource "remscontent_form" "test" {
         has_value       = ["y"]
       }
     },
+  ]
+}`,
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: true,
+			},
+		},
+	})
+}
+
+func TestUnitFormResource_ValidConfig_Basic(t *testing.T) {
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig + `
+resource "remscontent_form" "test" {
+  internal_name   = "My Form"
+  external_title  = "My Form"
+  organization_id = "test-org"
+  fields = [
+    { id = "1", title = "Full Name", type = "text" },
+    { id = "2", title = "Email",     type = "email" },
+    { id = "3", title = "Notes",     type = "texta", optional = true },
   ]
 }`,
 				PlanOnly:           true,

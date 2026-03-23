@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package resources
 
 import (
@@ -123,7 +120,7 @@ func (r *CategoryResource) Create(ctx context.Context, req resource.CreateReques
 		return
 	}
 
-	if categoryBody.Success == false {
+	if !categoryBody.Success {
 		resp.Diagnostics.AddError("Error Adding Category Entry", fmt.Sprintf("API returned success=false. Full response: %s", string(addResp.Body)))
 		return
 	}
@@ -206,7 +203,7 @@ func (r *CategoryResource) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
-	if editResp.JSON200.Success == false {
+	if !editResp.JSON200.Success {
 		resp.Diagnostics.AddError("Error Adding Category Entry", fmt.Sprintf("API returned success=false. Full response: %s", string(editResp.Body)))
 		return
 
