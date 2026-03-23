@@ -90,6 +90,14 @@ func (d *WorkflowDataSource) Read(ctx context.Context, req datasource.ReadReques
 			matchedWorkflow = &v
 		}
 	}
+	
+	if matchedWorkflow == nil {
+		resp.Diagnostics.AddError(
+			"Workflow Not Found",
+			fmt.Sprintf("No workflow found with title: %s", data.Title.ValueString()),
+		)
+		return
+	}
 
 	data.Id = types.Int64Value(matchedWorkflow.ID)
 

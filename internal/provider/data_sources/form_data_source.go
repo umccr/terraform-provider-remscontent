@@ -91,6 +91,14 @@ func (d *FormDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		}
 	}
 
+	if matchedForm == nil {
+		resp.Diagnostics.AddError(
+			"Form Not Found",
+			fmt.Sprintf("No Form found with internal_name: %s", data.InternalName.ValueString()),
+		)
+		return
+	}
+
 	data.Id = types.Int64Value(matchedForm.FormID)
 
 	// Save to Terraform state

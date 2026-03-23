@@ -91,6 +91,14 @@ func (d *CatalogueItemDataSource) Read(ctx context.Context, req datasource.ReadR
 		}
 	}
 
+	if matchedCatalogueItem == nil {
+		resp.Diagnostics.AddError(
+			"Catalogue Item Not Found",
+			fmt.Sprintf("No catalogueItem found with title: %s", data.Title.ValueString()),
+		)
+		return
+	}
+
 	data.Id = types.Int64Value(matchedCatalogueItem.ID)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

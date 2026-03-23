@@ -93,6 +93,14 @@ func (d *CategoryDataSource) Read(ctx context.Context, req datasource.ReadReques
 		}
 	}
 
+	if matchedCategory == nil {
+		resp.Diagnostics.AddError(
+			"Category Not Found",
+			fmt.Sprintf("No Category found with title: %s", data.Title.ValueString()),
+		)
+		return
+	}
+
 	data.Id = types.Int64Value(matchedCategory.CategoryID)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

@@ -83,12 +83,19 @@ func (d *ResourceDataSource) Read(ctx context.Context, req datasource.ReadReques
 			if matchedResource != nil {
 				resp.Diagnostics.AddError(
 					"Multiple Resource Found",
-					fmt.Sprintf("More than one resource found with title: %s", data.ResourceExtID.ValueString()),
+					fmt.Sprintf("More than one resource found with ResourceExternalId: %s", data.ResourceExtID.ValueString()),
 				)
 				return
 			}
 			matchedResource = &v
 		}
+	}
+	if matchedResource == nil {
+		resp.Diagnostics.AddError(
+			"Resource Not Found",
+			fmt.Sprintf("No resource found with ResourceExternalId: %s", data.ResourceExtID.ValueString()),
+		)
+		return
 	}
 
 	data.Id = types.Int64Value(matchedResource.ID)
