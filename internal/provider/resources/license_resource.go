@@ -288,7 +288,14 @@ func (r *LicenseResource) Update(ctx context.Context, req resource.UpdateRequest
 			Archived: plan.Archived.ValueBool(),
 		}
 
-		archivedResponse, _ := r.client.PutAPILicensesArchivedWithResponse(ctx, nil, licenseArchiveCommand)
+		archivedResponse, archiveErr := r.client.PutAPILicensesArchivedWithResponse(ctx, nil, licenseArchiveCommand)
+		if archiveErr != nil || archivedResponse == nil || archivedResponse.JSON200 == nil {
+			resp.Diagnostics.AddError(
+				"Error Archiving/Unarchiving License",
+				fmt.Sprintf("Unable to archive/unarchive license id: %d", plan.Id.ValueInt64()),
+			)
+			return
+		}
 
 		if !archivedResponse.JSON200.Success {
 			resp.Diagnostics.AddError(
@@ -306,7 +313,14 @@ func (r *LicenseResource) Update(ctx context.Context, req resource.UpdateRequest
 			Enabled: plan.Enabled.ValueBool(),
 		}
 
-		enabledResponse, _ := r.client.PutAPILicensesEnabledWithResponse(ctx, nil, licenseEnabledCommand)
+		enabledResponse, enabledErr := r.client.PutAPILicensesEnabledWithResponse(ctx, nil, licenseEnabledCommand)
+		if enabledErr != nil || enabledResponse == nil || enabledResponse.JSON200 == nil {
+			resp.Diagnostics.AddError(
+				"Error Enabled/Disabled License",
+				fmt.Sprintf("Unable to enabled/disabled license id: %d", plan.Id.ValueInt64()),
+			)
+			return
+		}
 		if !enabledResponse.JSON200.Success {
 			resp.Diagnostics.AddError(
 				"Error Enabled/Disabled License",
@@ -353,7 +367,14 @@ func (r *LicenseResource) Delete(ctx context.Context, req resource.DeleteRequest
 		ID:       state.Id.ValueInt64(),
 		Archived: true,
 	}
-	archivedResponse, _ := r.client.PutAPILicensesArchivedWithResponse(ctx, nil, licenseArchiveCommand)
+	archivedResponse, err := r.client.PutAPILicensesArchivedWithResponse(ctx, nil, licenseArchiveCommand)
+	if err != nil || archivedResponse == nil || archivedResponse.JSON200 == nil {
+		resp.Diagnostics.AddError(
+			"Error Archiving License",
+			fmt.Sprintf("Unable to archive license id: %d", state.Id.ValueInt64()),
+		)
+		return
+	}
 
 	if !archivedResponse.JSON200.Success {
 		resp.Diagnostics.AddError(
@@ -401,8 +422,8 @@ func (r *LicenseResource) uploadAttachment(ctx context.Context, filePath string)
 	}
 
 	// Must check Close error — it writes the final multipart boundary
-	if err := writer.Close(); err != nil {
-		return 0, fmt.Errorf("unable to finalize multipart body: %w", err)
+	if writerErr := writer.Close(); writerErr != nil {
+		return 0, fmt.Errorf("unable to finalize multipart body: %w", writerErr)
 	}
 
 	// Extract client once to avoid double type assertion
