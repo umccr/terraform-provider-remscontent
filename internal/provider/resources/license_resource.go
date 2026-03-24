@@ -238,8 +238,8 @@ func (r *LicenseResource) Read(ctx context.Context, req resource.ReadRequest, re
 		resp.State.RemoveResource(ctx)
 		return
 	}
-	if licenseResponse.JSON200 == nil {
-		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Unexpected status: %s", licenseResponse.Status()))
+	if licenseResponse.StatusCode() != 200 || licenseResponse.JSON200 == nil {
+		resp.Diagnostics.AddError("Error Reading License", fmt.Sprintf("status: %d, body: %s", licenseResponse.StatusCode(), string(licenseResponse.Body)))
 		return
 	}
 
@@ -317,9 +317,7 @@ func (r *LicenseResource) Update(ctx context.Context, req resource.UpdateRequest
 
 	}
 
-	licenseResponse, _ = r.client.GetAPILicensesLicenseIDWithResponse(ctx, plan.Id.ValueInt64(), nil)
-	licenseResult = licenseResponse.JSON200
-
+	licenseResponse, err = r.client.GetAPILicensesLicenseIDWithResponse(ctx, plan.Id.ValueInt64(), nil)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Reading License",
@@ -327,6 +325,15 @@ func (r *LicenseResource) Update(ctx context.Context, req resource.UpdateRequest
 		)
 		return
 	}
+	if licenseResponse.StatusCode() != 200 || licenseResponse.JSON200 == nil {
+		resp.Diagnostics.AddError(
+			"Error Reading License",
+			fmt.Sprintf("status: %d, body: %s", licenseResponse.StatusCode(), string(licenseResponse.Body)),
+		)
+		return
+	}
+	licenseResult = licenseResponse.JSON200
+
 	plan.Archived = types.BoolValue(licenseResult.Archived)
 	plan.Enabled = types.BoolValue(licenseResult.Enabled)
 
@@ -411,8 +418,8 @@ func (r *LicenseResource) uploadAttachment(ctx context.Context, filePath string)
 	}
 
 	for _, editor := range underlyingClient.RequestEditors {
-		if err := editor(ctx, req); err != nil {
-			return 0, fmt.Errorf("unable to apply request editor: %w", err)
+		if editorErr := editor(ctx, req); editorErr != nil {
+			return 0, fmt.Errorf("unable to apply request editor: %w", editorErr)
 		}
 	}
 

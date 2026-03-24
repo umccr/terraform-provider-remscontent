@@ -65,39 +65,6 @@ resource "remscontent_blacklist" "test" {
 	})
 }
 
-func TestBlacklistResource_CreateWithoutComment(t *testing.T) {
-	readJSON := `[
-  {
-    "blacklist/resource": {"resource/ext-id": "urn:example:dataset1"},
-    "blacklist/user":     {"userid": "alice"},
-    "blacklist/comment":  "",
-    "blacklist/added-at": "2024-01-01T00:00:00Z",
-    "blacklist/added-by": {"userid": "admin"}
-  }
-]`
-
-	factories, cleanup := testProviderWithMockServer(t, mockBlacklistHandler(readJSON))
-	defer cleanup()
-
-	resource.UnitTest(t, resource.TestCase{
-		ProtoV6ProviderFactories: factories,
-		Steps: []resource.TestStep{
-			{
-				Config: `
-provider "remscontent" {}
-resource "remscontent_blacklist" "test" {
-  resource_ext_id = "urn:example:dataset1"
-  user_id         = "alice"
-}`,
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("remscontent_blacklist.test", "resource_ext_id", "urn:example:dataset1"),
-					resource.TestCheckResourceAttr("remscontent_blacklist.test", "user_id", "alice"),
-				),
-			},
-		},
-	})
-}
-
 func TestBlacklistResource_DeleteOnDestroy(t *testing.T) {
 	factories, cleanup := testProviderWithMockServer(t, mockBlacklistHandler(blacklistEntryReadJSON))
 	defer cleanup()

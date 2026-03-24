@@ -11,16 +11,6 @@ import (
 	remsclient "github.com/umccr/terraform-provider-remscontent/internal/rems-client"
 )
 
-// providerConfig is a minimal valid provider block used in all test configs.
-// The fake endpoint is intentional — ValidateConfig tests never reach Apply.
-const providerConfig = `
-provider "remscontent" {
-  endpoint = "rems.fake.example.com"
-  api_user = "test-user"
-  api_key  = "test-api-key"
-}
-`
-
 func testProviderWithMockServer(t *testing.T, handler http.Handler) (providerFactories map[string]func() (tfprotov6.ProviderServer, error), cleanup func()) {
 	t.Helper()
 	srv := httptest.NewServer(handler)

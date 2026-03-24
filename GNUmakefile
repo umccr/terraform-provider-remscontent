@@ -8,6 +8,7 @@ install: build
 
 lint:
 	golangci-lint run
+	nilaway -include-pkgs="github.com/umccr/terraform-provider-remscontent" ./...
 
 generate:
 	cd tools; go generate ./...

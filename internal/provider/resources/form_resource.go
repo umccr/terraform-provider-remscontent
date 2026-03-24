@@ -624,7 +624,7 @@ func fromKeyLabelOptions(items *[]KeyLabelModel, language string) *[]remsclient.
 	for _, item := range *items {
 		opts = append(opts, remsclient.CreateFormCommandFieldsOptions{
 			Key:   item.Key.ValueString(),
-			Label: *shared.ToLocalizedString(item.Label, language),
+			Label: shared.ToLocalizedStringValue(item.Label, language),
 		})
 	}
 	return &opts
@@ -638,7 +638,7 @@ func fromKeyLabelColumns(items *[]KeyLabelModel, language string) *[]remsclient.
 	for _, item := range *items {
 		cols = append(cols, remsclient.CreateFormCommandFieldsColumns{
 			Key:   item.Key.ValueString(),
-			Label: *shared.ToLocalizedString(item.Label, language),
+			Label: shared.ToLocalizedStringValue(item.Label, language),
 		})
 	}
 	return &cols
@@ -676,7 +676,7 @@ func fromFormFieldModels(items []FormFieldResourceModel, language string) []rems
 		fields = append(fields, remsclient.NewFieldTemplate{
 			FieldID:          item.Id.ValueStringPointer(),
 			FieldType:        remsclient.NewFieldTemplateFieldType(item.Type.ValueString()),
-			FieldTitle:       *shared.ToLocalizedString(item.Title, language),
+			FieldTitle:       shared.ToLocalizedStringValue(item.Title, language),
 			FieldOptional:    item.Optional.ValueBool(),
 			FieldPlaceholder: shared.ToLocalizedString(item.Placeholder, language),
 			FieldInfoText:    shared.ToLocalizedString(item.Info, language),

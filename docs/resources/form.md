@@ -98,13 +98,13 @@ resource "remscontent_form" "test_form" {
 
 Required:
 
+- `id` (String) Field identifier. Must be unique within the form. Any string is allowed; the simplest approach is to use incrementing numbers (e.g., 1, 2, 3), but any unique string is valid.
 - `title` (String) The title for the field
 - `type` (String)
 
 Optional:
 
 - `columns` (Attributes List) (see [below for nested schema](#nestedatt--fields--columns))
-- `id` (String) Field identifier
 - `info` (String) Field description explain applicants what the field about.
 - `max_length` (Number) maximum character for the field
 - `optional` (Boolean)

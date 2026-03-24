@@ -7,14 +7,8 @@ terraform {
 }
 
 variable "email" {}
-variable "REMS_ENDPOINT" {}
-variable "REMS_API_KEY" {}
-variable "REMS_API_USER" {}
 
 provider "remscontent" {
-  endpoint = var.REMS_ENDPOINT # DNS name only, no https://
-  api_user = var.REMS_API_USER
-  api_key  = var.REMS_API_KEY
   language = "en" # Localization language for all resources (e.g. "en", "fi")
 }
 
@@ -31,14 +25,16 @@ resource "remscontent_form" "example-001" {
       "type" : "text",
       "optional" : false
     },
-    # {
-    #   "title" : "Email",
-    #   "type" : "email"
-    # },
-    # {
-    #   "title" : "Description",
-    #   "type" : "texta"
-    # },
+    {
+      "id" : "2",
+      "title" : "Email",
+      "type" : "email"
+    },
+    {
+      "id" : "3",
+      "title" : "Description",
+      "type" : "texta"
+    },
   ]
 }
 

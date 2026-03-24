@@ -1,11 +1,348 @@
 package resources_test
 
 import (
+	"fmt"
+	"net/http"
 	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
+
+// ============================================================
+// Integration tests — full CRUD with mock HTTP server
+// ============================================================
+
+// mockFormHandler returns a handler covering all form CRUD endpoints.
+// readJSON is the JSON returned by GET /api/forms/{id}.
+func mockFormHandler(readJSON string) http.Handler {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("POST /api/forms/create", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `{"success": true, "id": 42}`)
+	})
+
+	mux.HandleFunc("PUT /api/forms/edit", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `{"success": true}`)
+	})
+
+	mux.HandleFunc("PUT /api/forms/archived", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `{"success": true}`)
+	})
+
+	mux.HandleFunc("PUT /api/forms/enabled", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `{"success": true}`)
+	})
+
+	mux.HandleFunc("GET /api/forms/42/editable", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `{"success": true}`)
+	})
+
+	mux.HandleFunc("GET /api/forms/42", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, readJSON)
+	})
+
+	return mux
+}
+
+const minimalFormReadJSON = `{
+  "form/id": 42,
+  "form/internal-name": "My Form",
+  "form/external-title": {"en": "My Form"},
+  "form/fields": [
+    {
+      "field/id": "1",
+      "field/type": "text",
+      "field/title": {"en": "Full Name"},
+      "field/optional": false
+    }
+  ],
+  "enabled": true,
+  "archived": false,
+  "organization": {
+    "organization/id": "test-org",
+    "organization/name": {},
+    "organization/short-name": {}
+  }
+}`
+
+func TestFormResource_CreateMinimal(t *testing.T) {
+	factories, cleanup := testProviderWithMockServer(t, mockFormHandler(minimalFormReadJSON))
+	defer cleanup()
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories,
+		Steps: []resource.TestStep{
+			{
+				Config: `
+provider "remscontent" {}
+resource "remscontent_form" "test" {
+  internal_name   = "My Form"
+  external_title  = "My Form"
+  organization_id = "test-org"
+  fields = [
+    { id = "1", title = "Full Name", type = "text" }
+  ]
+}`,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("remscontent_form.test", "id", "42"),
+					resource.TestCheckResourceAttr("remscontent_form.test", "internal_name", "My Form"),
+					resource.TestCheckResourceAttr("remscontent_form.test", "external_title", "My Form"),
+					resource.TestCheckResourceAttr("remscontent_form.test", "organization_id", "test-org"),
+					resource.TestCheckResourceAttr("remscontent_form.test", "enabled", "true"),
+					resource.TestCheckResourceAttr("remscontent_form.test", "archived", "false"),
+					resource.TestCheckResourceAttr("remscontent_form.test", "fields.#", "1"),
+					resource.TestCheckResourceAttr("remscontent_form.test", "fields.0.id", "1"),
+					resource.TestCheckResourceAttr("remscontent_form.test", "fields.0.type", "text"),
+					resource.TestCheckResourceAttr("remscontent_form.test", "fields.0.title", "Full Name"),
+				),
+			},
+		},
+	})
+}
+
+func TestFormResource_UpdateTitle(t *testing.T) {
+	step1ReadJSON := `{
+  "form/id": 42, "form/internal-name": "Original Form", "form/external-title": {"en": "Original Form"},
+  "form/fields": [{"field/id": "1", "field/type": "text", "field/title": {"en": "Name"}, "field/optional": false}],
+  "enabled": true, "archived": false,
+  "organization": {"organization/id": "test-org", "organization/name": {}, "organization/short-name": {}}
+}`
+	step2ReadJSON := `{
+  "form/id": 42, "form/internal-name": "Updated Form", "form/external-title": {"en": "Updated Form"},
+  "form/fields": [{"field/id": "1", "field/type": "text", "field/title": {"en": "Name"}, "field/optional": false}],
+  "enabled": true, "archived": false,
+  "organization": {"organization/id": "test-org", "organization/name": {}, "organization/short-name": {}}
+}`
+
+	callCount := 0
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/forms/create", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `{"success": true, "id": 42}`)
+	})
+	mux.HandleFunc("PUT /api/forms/edit", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `{"success": true}`)
+	})
+	mux.HandleFunc("PUT /api/forms/archived", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `{"success": true}`)
+	})
+	mux.HandleFunc("PUT /api/forms/enabled", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `{"success": true}`)
+	})
+	mux.HandleFunc("GET /api/forms/42/editable", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `{"success": true}`)
+	})
+	mux.HandleFunc("GET /api/forms/42", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		callCount++
+		if callCount <= 1 {
+			fmt.Fprintln(w, step1ReadJSON)
+		} else {
+			fmt.Fprintln(w, step2ReadJSON)
+		}
+	})
+
+	factories, cleanup := testProviderWithMockServer(t, mux)
+	defer cleanup()
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories,
+		Steps: []resource.TestStep{
+			{
+				Config: `
+provider "remscontent" {}
+resource "remscontent_form" "test" {
+  internal_name   = "Original Form"
+  external_title  = "Original Form"
+  organization_id = "test-org"
+  fields = [
+    { id = "1", title = "Name", type = "text" }
+  ]
+}`,
+				Check: resource.TestCheckResourceAttr("remscontent_form.test", "internal_name", "Original Form"),
+			},
+			{
+				Config: `
+provider "remscontent" {}
+resource "remscontent_form" "test" {
+  internal_name   = "Updated Form"
+  external_title  = "Updated Form"
+  organization_id = "test-org"
+  fields = [
+    { id = "1", title = "Name", type = "text" }
+  ]
+}`,
+				Check: resource.TestCheckResourceAttr("remscontent_form.test", "internal_name", "Updated Form"),
+			},
+		},
+	})
+}
+
+func TestFormResource_DeleteOnDestroy(t *testing.T) {
+	factories, cleanup := testProviderWithMockServer(t, mockFormHandler(minimalFormReadJSON))
+	defer cleanup()
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories,
+		Steps: []resource.TestStep{
+			{
+				Config: `
+provider "remscontent" {}
+resource "remscontent_form" "test" {
+  internal_name   = "My Form"
+  external_title  = "My Form"
+  organization_id = "test-org"
+  fields = [
+    { id = "1", title = "Full Name", type = "text" }
+  ]
+}`,
+				Check: resource.TestCheckResourceAttr("remscontent_form.test", "id", "42"),
+			},
+			{
+				Destroy: true,
+				Config:  `provider "remscontent" {}`,
+			},
+		},
+	})
+}
+
+func TestFormResource_ReadRemovesStateWhen404(t *testing.T) {
+	callCount := 0
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/forms/create", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `{"success": true, "id": 42}`)
+	})
+	mux.HandleFunc("PUT /api/forms/archived", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `{"success": true}`)
+	})
+	mux.HandleFunc("GET /api/forms/42", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		callCount++
+		// First read (post-create refresh): form exists.
+		// Second read (plan/refresh for step 2): form is gone.
+		if callCount <= 1 {
+			fmt.Fprintln(w, minimalFormReadJSON)
+		} else {
+			http.NotFound(w, r)
+		}
+	})
+
+	factories, cleanup := testProviderWithMockServer(t, mux)
+	defer cleanup()
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories,
+		Steps: []resource.TestStep{
+			{
+				Config: `
+provider "remscontent" {}
+resource "remscontent_form" "test" {
+  internal_name   = "My Form"
+  external_title  = "My Form"
+  organization_id = "test-org"
+  fields = [
+    { id = "1", title = "Full Name", type = "text" }
+  ]
+}`,
+				Check: resource.TestCheckResourceAttr("remscontent_form.test", "id", "42"),
+			},
+			{
+				// When the form no longer exists on the server, the provider removes it
+				// from state and Terraform plans a recreate (non-empty plan).
+				Config: `
+provider "remscontent" {}
+resource "remscontent_form" "test" {
+  internal_name   = "My Form"
+  external_title  = "My Form"
+  organization_id = "test-org"
+  fields = [
+    { id = "1", title = "Full Name", type = "text" }
+  ]
+}`,
+				ExpectNonEmptyPlan: true,
+			},
+		},
+	})
+}
+
+func TestFormResource_ImportState(t *testing.T) {
+	factories, cleanup := testProviderWithMockServer(t, mockFormHandler(minimalFormReadJSON))
+	defer cleanup()
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories,
+		Steps: []resource.TestStep{
+			{
+				Config: `
+provider "remscontent" {}
+resource "remscontent_form" "test" {
+  internal_name   = "My Form"
+  external_title  = "My Form"
+  organization_id = "test-org"
+  fields = [
+    { id = "1", title = "Full Name", type = "text" }
+  ]
+}`,
+			},
+			{
+				ResourceName:      "remscontent_form.test",
+				ImportState:       true,
+				ImportStateId:     "42",
+				ImportStateVerify: true,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("remscontent_form.test", "id", "42"),
+					resource.TestCheckResourceAttr("remscontent_form.test", "internal_name", "My Form"),
+					resource.TestCheckResourceAttr("remscontent_form.test", "external_title", "My Form"),
+					resource.TestCheckResourceAttr("remscontent_form.test", "organization_id", "test-org"),
+					resource.TestCheckResourceAttr("remscontent_form.test", "enabled", "true"),
+					resource.TestCheckResourceAttr("remscontent_form.test", "archived", "false"),
+				),
+			},
+		},
+	})
+}
+
+func TestFormResource_APIError_OnCreate(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/forms/create", func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+	})
+
+	factories, cleanup := testProviderWithMockServer(t, mux)
+	defer cleanup()
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories,
+		Steps: []resource.TestStep{
+			{
+				Config: `
+provider "remscontent" {}
+resource "remscontent_form" "test" {
+  internal_name   = "My Form"
+  external_title  = "My Form"
+  organization_id = "test-org"
+  fields = [
+    { id = "1", title = "Full Name", type = "text" }
+  ]
+}`,
+				ExpectError: regexp.MustCompile(`Error Creating Form`),
+			},
+		},
+	})
+}
 
 // ============================================================
 // Unit tests — ValidateConfig

@@ -63,3 +63,27 @@ data "remscontent_actor" "test" {
 		},
 	})
 }
+
+func TestActorDataSource_APIError(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/workflows/actors", func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+	})
+
+	factories, cleanup := testProviderWithMockServer(t, mux)
+	defer cleanup()
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories,
+		Steps: []resource.TestStep{
+			{
+				Config: `
+provider "remscontent" {}
+data "remscontent_actor" "test" {
+  email = "alice@example.com"
+}`,
+				ExpectError: regexp.MustCompile(`Error fetching actors list`),
+			},
+		},
+	})
+}

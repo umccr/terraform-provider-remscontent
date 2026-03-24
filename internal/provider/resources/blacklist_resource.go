@@ -60,7 +60,7 @@ func (r *BlacklistResource) Schema(ctx context.Context, req resource.SchemaReque
 				},
 			},
 			"comment": schema.StringAttribute{
-				Optional:            true,
+				Required:            true,
 				MarkdownDescription: "A comment explaining the reason for the blacklist entry.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),

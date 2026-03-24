@@ -62,12 +62,16 @@ func (d *LicenseDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	}
 
 	licenseResponse, err := d.client.GetAPILicensesWithResponse(ctx, nil)
-	licenseResult := *licenseResponse.JSON200
-
 	if err != nil {
 		resp.Diagnostics.AddError("Error reading license", err.Error())
 		return
 	}
+	if licenseResponse.StatusCode() != 200 || licenseResponse.JSON200 == nil {
+		resp.Diagnostics.AddError("No license found", fmt.Sprintf("status: %d, body: %s", licenseResponse.StatusCode(), string(licenseResponse.Body)))
+		return
+	}
+
+	licenseResult := *licenseResponse.JSON200
 	if licenseResult == nil {
 		resp.Diagnostics.AddError("No license found", "The license list is nil.")
 		return

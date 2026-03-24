@@ -91,11 +91,12 @@ func (r *CategoryResource) Create(ctx context.Context, req resource.CreateReques
 		}
 		categoriesChildren = &s
 	}
+
 	cmd := remsclient.CreateCategoryCommand{
 		CategoryChildren:     categoriesChildren,
 		CategoryDescription:  shared.ToLocalizedString(plan.Description, r.language),
 		CategoryDisplayOrder: plan.DisplayOrder.ValueInt64Pointer(),
-		CategoryTitle:        *shared.ToLocalizedString(plan.Title, r.language),
+		CategoryTitle:        shared.ToLocalizedStringValue(plan.Title, r.language),
 	}
 
 	addResp, addErr := r.client.PostAPICategoriesCreateWithResponse(ctx, nil, cmd)
@@ -185,12 +186,13 @@ func (r *CategoryResource) Update(ctx context.Context, req resource.UpdateReques
 		}
 		categoriesChildren = &s
 	}
+
 	cmd := remsclient.UpdateCategoryCommand{
 		CategoryID:           plan.Id.ValueInt64(),
 		CategoryChildren:     categoriesChildren,
 		CategoryDescription:  shared.ToLocalizedString(plan.Description, r.language),
 		CategoryDisplayOrder: plan.DisplayOrder.ValueInt64Pointer(),
-		CategoryTitle:        *shared.ToLocalizedString(plan.Title, r.language),
+		CategoryTitle:        shared.ToLocalizedStringValue(plan.Title, r.language),
 	}
 
 	editResp, editErr := r.client.PutAPICategoriesEditWithResponse(ctx, nil, cmd)

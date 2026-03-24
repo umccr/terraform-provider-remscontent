@@ -22,6 +22,14 @@ func GetLocalizedString(m *remsclient.LocalizedString, language string) types.St
 	return types.StringValue(val)
 }
 
+// ToLocalizedStringValue returns a LocalizedString value for required fields that are
+// guaranteed to be non-null and non-unknown (e.g. schema Required attributes).
+func ToLocalizedStringValue(s types.String, language string) remsclient.LocalizedString {
+	return remsclient.LocalizedString{
+		language: s.ValueString(),
+	}
+}
+
 func ToLocalizedString(s types.String, language string) *remsclient.LocalizedString {
 	if s.IsNull() || s.IsUnknown() {
 		return nil
