@@ -1,21 +1,15 @@
 # Terraform Provider REMS Content
 
-This is a provider for Terraform that manages content
-of REMS instances (https://github.com/CSCfi/rems). Note that this
-does not install the REMS software itself - this just manages the
-content of an existing REMS instance (forms, committees etc).
+A Terraform provider for managing the content of [REMS](https://github.com/CSCfi/rems) (Resource Entitlement Management System) instances. This provider does **not** install REMS itself — it manages the content of an existing REMS instance: forms, workflows, licences, catalogue items, categories, and more.
 
 ## Requirements
 
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0
-- [Go](https://golang.org/doc/install) >= 1.24
+- [Go](https://golang.org/doc/install) >= 1.24 (for building from source)
 
-## Using the provider
+## Using the Provider
 
-This will be filled in as the provider is written.
-
-As an example (not necessarily updated, more to show the concepts) - see the generated documentation
-or official example code for more details.
+Configure the provider with your REMS instance details. All attributes can alternatively be supplied via environment variables (`REMS_ENDPOINT`, `REMS_API_USER`, `REMS_API_KEY`, `REMS_LANGUAGE`).
 
 ```terraform
 terraform {
@@ -27,38 +21,93 @@ terraform {
 }
 
 provider "remscontent" {
-  endpoint = "rems.somewhere.com"
-  api_user = "..."
-  api_key  = "..."
-}
-
-resource "remscontent_form" "application_form" {
-  organization_id = "Our Organisation"
-  title           = "Access to XYZ data"
-
-  fields = [
-    provider::remscontent::form_field_header("xyz_applicant", { en : "Applicant" }),
-    provider::remscontent::form_field_header("xyz_purpose", { en : "Purpose" }),
-  ]
+  endpoint = "rems.example.org" # DNS name only, no https://
+  api_user = "admin@example.org"
+  api_key  = "my-secret-api-key"
+  language = "en" # Localization language for all resources (e.g. "en", "fi")
 }
 ```
 
-## Building The Provider
+See the [provider documentation](docs/index.md) for full configuration reference.
 
-1. Clone the repository
-2. Enter the repository directory
-3. Build the provider using the Go `install` command:
+### Resources
+
+| Resource | Documentation |
+|---|---|
+| `remscontent_form` | [docs/resources/form.md](docs/resources/form.md) |
+| `remscontent_workflow` | [docs/resources/workflow.md](docs/resources/workflow.md) |
+| `remscontent_license` | [docs/resources/license.md](docs/resources/license.md) |
+| `remscontent_resource` | [docs/resources/resource.md](docs/resources/resource.md) |
+| `remscontent_catalogue_item` | [docs/resources/catalogue_item.md](docs/resources/catalogue_item.md) |
+| `remscontent_category` | [docs/resources/category.md](docs/resources/category.md) |
+| `remscontent_blacklist` | [docs/resources/blacklist.md](docs/resources/blacklist.md) |
+
+### Data Sources
+
+| Data Source | Documentation |
+|---|---|
+| `remscontent_actor` | [docs/data-sources/actor.md](docs/data-sources/actor.md) |
+| `remscontent_organization` | [docs/data-sources/organization.md](docs/data-sources/organization.md) |
+| `remscontent_form` | [docs/data-sources/form.md](docs/data-sources/form.md) |
+| `remscontent_workflow` | [docs/data-sources/workflow.md](docs/data-sources/workflow.md) |
+| `remscontent_license` | [docs/data-sources/license.md](docs/data-sources/license.md) |
+| `remscontent_catalogue_item` | [docs/data-sources/catalogue_item.md](docs/data-sources/catalogue_item.md) |
+| `remscontent_category` | [docs/data-sources/category.md](docs/data-sources/category.md) |
+| `remscontent_blacklist_user` | [docs/data-sources/blacklist_user.md](docs/data-sources/blacklist_user.md) |
+| `remscontent_resource` | [docs/data-sources/resource.md](docs/data-sources/resource.md) |
+
+## Usage Examples
+
+End-to-end runnable examples are under [`examples/usage/`](examples/usage/):
+
+| Example | Description |
+|---|---|
+| [`simple_form`](examples/usage/simple_form/) | Create REMS forms, including conditional field visibility |
+| [`simple_license`](examples/usage/simple_license/) | Create licences (inline text and file attachment types) |
+| [`simple_example`](examples/usage/simple_example/) | Full catalogue item setup — wires together organisation, licence, workflow, form, resource, category, and blacklist |
+
+Each example directory contains a `README.md` with further details and a `main.tf` you can run directly.
+
+## Building the Provider
 
 ```shell
+git clone https://github.com/umccr/terraform-provider-remscontent
+cd terraform-provider-remscontent
 go install
 ```
 
-## Adding Dependencies
+This places the provider binary in `$GOPATH/bin`.
+
+## Developing the Provider
+
+To use a locally built provider before it is published to a registry, add a dev override to `~/.terraformrc`:
+
+```hcl
+provider_installation {
+  dev_overrides {
+    "registry.terraform.io/umccr/remscontent" = "/path/to/your/GOPATH/bin"
+  }
+
+  # All other providers install normally from their registries.
+  direct {}
+}
+```
+
+To regenerate documentation from source annotations:
+
+```shell
+make generate
+```
+
+To run the test suite:
+
+```shell
+make test
+```
+
+### Adding Dependencies
 
 This provider uses [Go modules](https://github.com/golang/go/wiki/Modules).
-Please see the Go documentation for the most up to date information about using Go modules.
-
-To add a new dependency `github.com/author/dependency` to your Terraform provider:
 
 ```shell
 go get github.com/author/dependency
@@ -66,56 +115,3 @@ go mod tidy
 ```
 
 Then commit the changes to `go.mod` and `go.sum`.
-
-## Developing the Provider
-
-If you wish to work on the provider, you'll first need [Go](http://www.golang.org) installed on your machine (see [Requirements](#requirements) above).
-
-To compile the provider, run `go install`. This will build the provider and put the provider binary in the `$GOPATH/bin` directory.
-
-To actually see the provider in use whilst it is not published to a registry - you will need to make a local
-development override in your `~/.terraformrc` (make sure you customise the path to your Go binaries).
-
-```
-provider_installation {
-
-  dev_overrides {
-      "registry.terraform.io/umccr/remscontent" = ".. path where your Go binaries get installed .."
-  }
-
-  # For all other providers, install them directly from their origin provider
-  # registries as normal. If you omit this, Terraform will _only_ use
-  # the dev_overrides block, and so no other providers will be available.
-  direct {}
-}
-```
-
-To generate or update documentation, run `make generate`.
-
-## Archive (may not be accurate)
-
-_This template repository is built on the [Terraform Plugin Framework](https://github.com/hashicorp/terraform-plugin-framework). The template
-repository built on the [Terraform Plugin SDK](https://github.com/hashicorp/terraform-plugin-sdk) can be
-found at [terraform-provider-scaffolding](https://github.com/hashicorp/terraform-provider-scaffolding). See [Which SDK Should I Use?](https://developer.hashicorp.com/terraform/plugin/framework-benefits) in the Terraform documentation for additional information._
-
-This repository is a *template* for a [Terraform](https://www.terraform.io) provider. It is intended as a starting point for creating Terraform providers, containing:
-
-- A resource and a data source (`internal/provider/`),
-- Examples (`examples/`) and generated documentation (`docs/`),
-- Miscellaneous meta files.
-
-These files contain boilerplate code that you will need to edit to
-create your own Terraform provider. Tutorials for creating Terraform providers
-can be found on the [HashiCorp Developer](https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework) platform. _Terraform Plugin Framework specific guides are titled accordingly._
-
-Please see the [GitHub template repository documentation](https://help.github.com/en/github/creating-cloning-and-archiving-repositories/creating-a-repository-from-a-template) for how to create a new repository from this template on GitHub.
-
-Once you've written your provider, you'll want to [publish it on the Terraform Registry](https://developer.hashicorp.com/terraform/registry/providers/publishing) so that others can use it.
-
-In order to run the full suite of Acceptance tests, run `make testacc`.
-
-*Note:* Acceptance tests create real resources, and often cost money to run.
-
-```shell
-make testacc
-```
