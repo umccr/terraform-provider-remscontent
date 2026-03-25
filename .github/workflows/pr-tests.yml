@@ -29,9 +29,6 @@ jobs:
           go-version: ${{ matrix.go-version }}
           cache: true
 
-      - name: Install dependencies
-        run: go mod download
-
       - name: Verify dependencies
         run: go mod verify
 
@@ -55,11 +52,13 @@ jobs:
           go-version: ${{ matrix.go-version }}
           cache: true
 
-      - name: Install dependencies
-        run: go mod download
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.11
 
-      - name: Verify dependencies
-        run: go mod verify
+      - name: Install nilaway
+        run: go install go.uber.org/nilaway/cmd/nilaway@latest
 
-      - name: Run golangci-lint
-        run: make lint
+      - name: Run nilaway
+        run: make nilaway
