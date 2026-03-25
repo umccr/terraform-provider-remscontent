@@ -5,10 +5,12 @@ terraform {
     }
   }
 }
-
-provider "remscontent" {}
-
 variable "email" {}
+
+provider "remscontent" {
+  language = "en" # Localization language for all resources (e.g. "en", "fi")
+}
+
 
 data "remscontent_blacklist_user" "user_1" {
   email = var.email
@@ -42,12 +44,19 @@ resource "remscontent_category" "category_2" {
   display_order = 2
 }
 
+data "remscontent_workflow" "example_1_workflow" {
+  title = "Example Workflow 1"
+}
+
+data "remscontent_form" "test_form" {
+  internal_name = "Test Form"
+}
+
 resource "remscontent_catalogue_item" "item1" {
   organization_id = data.remscontent_organization.ccgcm_org.id
   resource_id     = resource.remscontent_resource.resource_1.id
-  # The following is just putting id rather than using data/resource to fetch the id
-  workflow_id = 11
-  form_id     = 17
+  workflow_id     = data.remscontent_workflow.example_1_workflow.id
+  form_id         = data.remscontent_form.test_form.id
   localizations = {
     title   = "The title for catalogue item 1 - edit01"
     infourl = "url for catalogue item 1"

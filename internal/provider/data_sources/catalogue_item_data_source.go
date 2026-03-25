@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package data_sources
 
 import (
@@ -94,7 +91,15 @@ func (d *CatalogueItemDataSource) Read(ctx context.Context, req datasource.ReadR
 		}
 	}
 
-	data.Id = types.Int64Value(int64(matchedCatalogueItem.ID))
+	if matchedCatalogueItem == nil {
+		resp.Diagnostics.AddError(
+			"Catalogue Item Not Found",
+			fmt.Sprintf("No catalogueItem found with title: %s", data.Title.ValueString()),
+		)
+		return
+	}
+
+	data.Id = types.Int64Value(matchedCatalogueItem.ID)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

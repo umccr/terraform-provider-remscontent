@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package data_sources
 
 import (
@@ -96,7 +93,15 @@ func (d *CategoryDataSource) Read(ctx context.Context, req datasource.ReadReques
 		}
 	}
 
-	data.Id = types.Int64Value(int64(matchedCategory.CategoryID))
+	if matchedCategory == nil {
+		resp.Diagnostics.AddError(
+			"Category Not Found",
+			fmt.Sprintf("No Category found with title: %s", data.Title.ValueString()),
+		)
+		return
+	}
+
+	data.Id = types.Int64Value(matchedCategory.CategoryID)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

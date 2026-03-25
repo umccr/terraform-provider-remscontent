@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package resources
 
 import (
@@ -93,9 +90,9 @@ func (r *CatalogueItemResource) Schema(ctx context.Context, req resource.SchemaR
 			"form_id": schema.Int64Attribute{
 				Optional:            true,
 				MarkdownDescription: "The internal ID of the form to use. If omitted, no form is required.",
-				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.RequiresReplace(),
-				},
+				// PlanModifiers: []planmodifier.Int64{
+				// 	int64planmodifier.RequiresReplace(),
+				// },
 			},
 			"localizations": schema.SingleNestedAttribute{
 				Required:            true,
@@ -205,14 +202,17 @@ func (r *CatalogueItemResource) Read(ctx context.Context, req resource.ReadReque
 		resp.Diagnostics.AddError("Error Reading Catalogue Item", fmt.Sprintf("status: %d, body: %s", readResp.StatusCode(), string(readResp.Body)))
 		return
 	}
-
 	item := readResp.JSON200
 	state.OrganizationId = types.StringValue(item.Organization.OrganizationID)
 	state.ResourceId = types.Int64Value(item.ResourceID)
 	state.WorkflowId = types.Int64Value(item.Wfid)
 	state.Enabled = types.BoolValue(item.Enabled)
 	state.Archived = types.BoolValue(item.Archived)
-	state.FormId = types.Int64Value(*item.Formid)
+	if item.Formid != nil {
+		state.FormId = types.Int64Value(*item.Formid)
+	} else {
+		state.FormId = types.Int64Null()
+	}
 
 	state.Localizations = &CatalogueItemLocalizationModel{
 		Title:   types.StringValue(item.Localizations[r.language].Title),

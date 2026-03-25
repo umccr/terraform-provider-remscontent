@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package data_sources
 
 import (
@@ -94,7 +91,15 @@ func (d *WorkflowDataSource) Read(ctx context.Context, req datasource.ReadReques
 		}
 	}
 
-	data.Id = types.Int64Value(int64(matchedWorkflow.ID))
+	if matchedWorkflow == nil {
+		resp.Diagnostics.AddError(
+			"Workflow Not Found",
+			fmt.Sprintf("No workflow found with title: %s", data.Title.ValueString()),
+		)
+		return
+	}
+
+	data.Id = types.Int64Value(matchedWorkflow.ID)
 
 	// Save to Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

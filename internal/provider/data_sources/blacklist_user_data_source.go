@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package data_sources
 
 import (
@@ -75,12 +72,18 @@ func (d *BlacklistUserDataSource) Read(ctx context.Context, req datasource.ReadR
 	usersList := usersResponse.JSON200
 
 	for _, v := range *usersList {
-
 		if v.Email != nil && *v.Email == data.Email.ValueString() {
 			data.Id = types.StringValue(v.Userid)
 			break
 		}
+	}
 
+	if data.Id.IsNull() {
+		resp.Diagnostics.AddError(
+			"User Not Found for Blacklist",
+			fmt.Sprintf("No user available to blacklist with email: %s", data.Email.ValueString()),
+		)
+		return
 	}
 
 	// Save to Terraform state

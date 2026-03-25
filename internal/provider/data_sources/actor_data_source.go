@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package data_sources
 
 import (
@@ -75,12 +72,18 @@ func (d *ActorDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 	actorsList := actorsResponse.JSON200
 
 	for _, v := range *actorsList {
-
 		if v.Email != nil && *v.Email == data.Email.ValueString() {
 			data.Id = types.StringValue(v.Userid)
 			break
 		}
+	}
 
+	if data.Id.IsNull() {
+		resp.Diagnostics.AddError(
+			"Actor Not Found",
+			fmt.Sprintf("No actor found with email: %s", data.Email.ValueString()),
+		)
+		return
 	}
 
 	// Save to Terraform state

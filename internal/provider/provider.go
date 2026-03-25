@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package provider
 
 import (
@@ -41,7 +38,7 @@ type RemsContentProvider struct {
 }
 
 // contentTypeTransport strips charset from Content-Type headers
-// e.g. "application/json; charset=utf-8" -> "application/json"
+// e.g. "application/json; charset=utf-8" -> "application/json".
 type contentTypeTransport struct {
 	wrapped http.RoundTripper
 }
@@ -269,7 +266,6 @@ func New(version string) func() provider.Provider {
 	}
 }
 
-// Add a test constructor
 func NewWithClient(version string, c *remsclient.ClientWithResponses) func() provider.Provider {
 	return func() provider.Provider {
 		return &RemsContentProvider{version: version, clientOverride: c}

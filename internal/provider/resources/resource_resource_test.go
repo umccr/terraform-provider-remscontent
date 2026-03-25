@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package resources_test
 
 import (
@@ -68,7 +65,7 @@ resource "remscontent_resource" "test" {
 }`,
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("remscontent_resource.test", "id", "10"),
-					resource.TestCheckResourceAttr("remscontent_resource.test", "resid", "urn:example:dataset1"),
+					resource.TestCheckResourceAttr("remscontent_resource.test", "resource_ext_id", "urn:example:dataset1"),
 					resource.TestCheckResourceAttr("remscontent_resource.test", "organization_id", "test-org"),
 					// computed defaults
 					resource.TestCheckResourceAttr("remscontent_resource.test", "enabled", "true"),

@@ -7,6 +7,7 @@ linters:
     - errcheck
     - forcetypeassert
     - godot
+    - govet
     - ineffassign
     - makezero
     - misspell
@@ -17,6 +18,11 @@ linters:
     - unparam
     - unused
     - usetesting
+  settings:
+    govet:
+      enable:
+        - nilness
+        - shadow
   exclusions:
     generated: lax
     presets:

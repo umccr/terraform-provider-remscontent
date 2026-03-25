@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package resources
 
 import (
@@ -94,11 +91,12 @@ func (r *CategoryResource) Create(ctx context.Context, req resource.CreateReques
 		}
 		categoriesChildren = &s
 	}
+
 	cmd := remsclient.CreateCategoryCommand{
 		CategoryChildren:     categoriesChildren,
 		CategoryDescription:  shared.ToLocalizedString(plan.Description, r.language),
 		CategoryDisplayOrder: plan.DisplayOrder.ValueInt64Pointer(),
-		CategoryTitle:        *shared.ToLocalizedString(plan.Title, r.language),
+		CategoryTitle:        shared.ToLocalizedStringValue(plan.Title, r.language),
 	}
 
 	addResp, addErr := r.client.PostAPICategoriesCreateWithResponse(ctx, nil, cmd)
@@ -123,7 +121,7 @@ func (r *CategoryResource) Create(ctx context.Context, req resource.CreateReques
 		return
 	}
 
-	if categoryBody.Success == false {
+	if !categoryBody.Success {
 		resp.Diagnostics.AddError("Error Adding Category Entry", fmt.Sprintf("API returned success=false. Full response: %s", string(addResp.Body)))
 		return
 	}
@@ -188,12 +186,13 @@ func (r *CategoryResource) Update(ctx context.Context, req resource.UpdateReques
 		}
 		categoriesChildren = &s
 	}
+
 	cmd := remsclient.UpdateCategoryCommand{
 		CategoryID:           plan.Id.ValueInt64(),
 		CategoryChildren:     categoriesChildren,
 		CategoryDescription:  shared.ToLocalizedString(plan.Description, r.language),
 		CategoryDisplayOrder: plan.DisplayOrder.ValueInt64Pointer(),
-		CategoryTitle:        *shared.ToLocalizedString(plan.Title, r.language),
+		CategoryTitle:        shared.ToLocalizedStringValue(plan.Title, r.language),
 	}
 
 	editResp, editErr := r.client.PutAPICategoriesEditWithResponse(ctx, nil, cmd)
@@ -206,7 +205,7 @@ func (r *CategoryResource) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
-	if editResp.JSON200.Success == false {
+	if !editResp.JSON200.Success {
 		resp.Diagnostics.AddError("Error Adding Category Entry", fmt.Sprintf("API returned success=false. Full response: %s", string(editResp.Body)))
 		return
 
