@@ -117,7 +117,7 @@ func (r *CategoryResource) Create(ctx context.Context, req resource.CreateReques
 	}
 
 	if err := json.Unmarshal(addResp.Body, &categoryBody); err != nil {
-		fmt.Println("Error:", err)
+		resp.Diagnostics.AddError("Error Unmarshal Category Body Response", err.Error())
 		return
 	}
 
@@ -200,15 +200,9 @@ func (r *CategoryResource) Update(ctx context.Context, req resource.UpdateReques
 		resp.Diagnostics.AddError("Error Edit Category: ", editErr.Error())
 		return
 	}
-	if editResp.StatusCode() != 200 || editResp.JSON200 == nil {
-		resp.Diagnostics.AddError("Error Adding Category Entry", fmt.Sprintf("status: %d, body: %s", editResp.StatusCode(), string(editResp.Body)))
+	if editResp.JSON200 == nil || !editResp.JSON200.Success {
+		resp.Diagnostics.AddError("Error Edit Category Entry", fmt.Sprintf("status: %d, body: %s", editResp.StatusCode(), string(editResp.Body)))
 		return
-	}
-
-	if !editResp.JSON200.Success {
-		resp.Diagnostics.AddError("Error Adding Category Entry", fmt.Sprintf("API returned success=false. Full response: %s", string(editResp.Body)))
-		return
-
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)

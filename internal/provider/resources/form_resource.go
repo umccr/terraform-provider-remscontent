@@ -242,12 +242,43 @@ func (r *FormResource) Create(ctx context.Context, req resource.CreateRequest, r
 		resp.Diagnostics.AddError("Error Creating Form", formErr.Error())
 		return
 	}
-	if formResponse.StatusCode() != 200 || formResponse.JSON200 == nil {
+	if formResponse.JSON200 == nil || formResponse.JSON200.ID == nil {
 		resp.Diagnostics.AddError("Error Creating Form", fmt.Sprintf("status: %d, body: %s", formResponse.StatusCode(), string(formResponse.Body)))
 		return
 	}
+	planId := *formResponse.JSON200.ID
+	plan.Id = types.Int64Value(planId)
 
-	plan.Id = types.Int64Value(*formResponse.JSON200.ID)
+	// Update Archival state
+	formArchiveCommand := remsclient.ArchivedCommand{
+		ID:       planId,
+		Archived: plan.Archived.ValueBool(),
+	}
+	archiveResponse, archiveErr := r.client.PutAPIFormsArchivedWithResponse(ctx, nil, formArchiveCommand)
+	if archiveErr != nil {
+		resp.Diagnostics.AddError("Error Archiving/Unarchiving Form", archiveErr.Error())
+		return
+	}
+	if archiveResponse.JSON200 == nil || !archiveResponse.JSON200.Success {
+		resp.Diagnostics.AddError("Error Archiving/Unarchiving Form", fmt.Sprintf("status: %d, body: %s", archiveResponse.StatusCode(), string(archiveResponse.Body)))
+		return
+	}
+
+	// Update Enabled state
+	formEnabledCommand := remsclient.EnabledCommand{
+		ID:      planId,
+		Enabled: plan.Enabled.ValueBool(),
+	}
+	enabledResponse, enabledErr := r.client.PutAPIFormsEnabledWithResponse(ctx, nil, formEnabledCommand)
+	if enabledErr != nil {
+		resp.Diagnostics.AddError("Error Enabled/Disabled Form", enabledErr.Error())
+		return
+	}
+	if enabledResponse.JSON200 == nil || !enabledResponse.JSON200.Success {
+		resp.Diagnostics.AddError("Enabled/Disabled Form is Unsuccessful", fmt.Sprintf("status: %d, body: %s", enabledResponse.StatusCode(), string(enabledResponse.Body)))
+		return
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -269,7 +300,7 @@ func (r *FormResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		resp.State.RemoveResource(ctx)
 		return
 	}
-	if formItemResponse.StatusCode() != 200 || formItemResponse.JSON200 == nil {
+	if formItemResponse.JSON200 == nil {
 		resp.Diagnostics.AddError("Error Reading Form", fmt.Sprintf("status: %d, body: %s", formItemResponse.StatusCode(), string(formItemResponse.Body)))
 		return
 	}
@@ -344,7 +375,7 @@ func (r *FormResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		resp.Diagnostics.AddError("Error Archiving/Unarchiving Form", archiveErr.Error())
 		return
 	}
-	if archiveResponse.StatusCode() != 200 || archiveResponse.JSON200 == nil {
+	if archiveResponse.JSON200 == nil || !archiveResponse.JSON200.Success {
 		resp.Diagnostics.AddError("Error Archiving/Unarchiving Form", fmt.Sprintf("status: %d, body: %s", archiveResponse.StatusCode(), string(archiveResponse.Body)))
 		return
 	}
@@ -359,7 +390,7 @@ func (r *FormResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		resp.Diagnostics.AddError("Error Enabled/Disabled Form", enabledErr.Error())
 		return
 	}
-	if enabledResponse.StatusCode() != 200 || enabledResponse.JSON200 == nil {
+	if enabledResponse.JSON200 == nil || !enabledResponse.JSON200.Success {
 		resp.Diagnostics.AddError("Error Enabled/Disabled Form", fmt.Sprintf("status: %d, body: %s", enabledResponse.StatusCode(), string(enabledResponse.Body)))
 		return
 	}

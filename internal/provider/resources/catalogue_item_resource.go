@@ -90,9 +90,9 @@ func (r *CatalogueItemResource) Schema(ctx context.Context, req resource.SchemaR
 			"form_id": schema.Int64Attribute{
 				Optional:            true,
 				MarkdownDescription: "The internal ID of the form to use. If omitted, no form is required.",
-				// PlanModifiers: []planmodifier.Int64{
-				// 	int64planmodifier.RequiresReplace(),
-				// },
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.RequiresReplace(),
+				},
 			},
 			"localizations": schema.SingleNestedAttribute{
 				Required:            true,
@@ -266,7 +266,7 @@ func (r *CatalogueItemResource) Update(ctx context.Context, req resource.UpdateR
 		resp.Diagnostics.AddError("Error Updating Catalogue Item", editErr.Error())
 		return
 	}
-	if editResp.StatusCode() != 200 || editResp.JSON200 == nil {
+	if editResp.JSON200 == nil || !editResp.JSON200.Success {
 		resp.Diagnostics.AddError("Error Updating Catalogue Item", fmt.Sprintf("status: %d, body: %s", editResp.StatusCode(), string(editResp.Body)))
 		return
 	}
@@ -280,7 +280,7 @@ func (r *CatalogueItemResource) Update(ctx context.Context, req resource.UpdateR
 		resp.Diagnostics.AddError("Error Setting Catalogue Item Enabled State", enabledErr.Error())
 		return
 	}
-	if enabledResp.StatusCode() != 200 || enabledResp.JSON200 == nil {
+	if enabledResp.JSON200 == nil || !enabledResp.JSON200.Success {
 		resp.Diagnostics.AddError("Error Setting Catalogue Item Enabled State", fmt.Sprintf("status: %d, body: %s", enabledResp.StatusCode(), string(enabledResp.Body)))
 		return
 	}
@@ -294,7 +294,7 @@ func (r *CatalogueItemResource) Update(ctx context.Context, req resource.UpdateR
 		resp.Diagnostics.AddError("Error Setting Catalogue Item Archived State", archivedErr.Error())
 		return
 	}
-	if archivedResp.StatusCode() != 200 || archivedResp.JSON200 == nil {
+	if archivedResp.JSON200 == nil || !archivedResp.JSON200.Success {
 		resp.Diagnostics.AddError("Error Setting Catalogue Item Archived State", fmt.Sprintf("status: %d, body: %s", archivedResp.StatusCode(), string(archivedResp.Body)))
 		return
 	}
@@ -317,7 +317,7 @@ func (r *CatalogueItemResource) Delete(ctx context.Context, req resource.DeleteR
 		resp.Diagnostics.AddError("Error Archiving Catalogue Item", archivedErr.Error())
 		return
 	}
-	if archivedResp.StatusCode() != 200 || archivedResp.JSON200 == nil {
+	if archivedResp.JSON200 == nil || !archivedResp.JSON200.Success {
 		resp.Diagnostics.AddError("Error Archiving Catalogue Item", fmt.Sprintf("status: %d, body: %s", archivedResp.StatusCode(), string(archivedResp.Body)))
 		return
 	}
