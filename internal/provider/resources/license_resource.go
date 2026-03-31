@@ -307,18 +307,6 @@ func (r *LicenseResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	licenseResponse, err := r.client.GetAPILicensesLicenseIDWithResponse(ctx, plan.Id.ValueInt64(), nil)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading License",
-			err.Error(),
-		)
-		return
-	}
-
-	licenseResult := licenseResponse.JSON200
-
-	// archiving api requests
 	licenseArchiveCommand := remsclient.ArchivedCommand{
 		ID:       plan.Id.ValueInt64(),
 		Archived: plan.Archived.ValueBool(),
@@ -341,14 +329,13 @@ func (r *LicenseResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	// disabled api request
 	licenseEnabledCommand := remsclient.EnabledCommand{
 		ID:      plan.Id.ValueInt64(),
 		Enabled: plan.Enabled.ValueBool(),
 	}
 
 	enabledResponse, enabledErr := r.client.PutAPILicensesEnabledWithResponse(ctx, nil, licenseEnabledCommand)
-	if enabledErr == nil {
+	if enabledErr != nil {
 		resp.Diagnostics.AddError(
 			"Error Enabled/Disabled License",
 			fmt.Sprintf("Unable to enabled/disabled license id: %d", plan.Id.ValueInt64()),
@@ -362,26 +349,6 @@ func (r *LicenseResource) Update(ctx context.Context, req resource.UpdateRequest
 		)
 		return
 	}
-
-	licenseResponse, err = r.client.GetAPILicensesLicenseIDWithResponse(ctx, plan.Id.ValueInt64(), nil)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading License",
-			err.Error(),
-		)
-		return
-	}
-	if licenseResponse.StatusCode() != 200 || licenseResponse.JSON200 == nil {
-		resp.Diagnostics.AddError(
-			"Error Reading License",
-			fmt.Sprintf("status: %d, body: %s", licenseResponse.StatusCode(), string(licenseResponse.Body)),
-		)
-		return
-	}
-	licenseResult = licenseResponse.JSON200
-
-	plan.Archived = types.BoolValue(licenseResult.Archived)
-	plan.Enabled = types.BoolValue(licenseResult.Enabled)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }

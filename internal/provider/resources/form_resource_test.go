@@ -228,6 +228,10 @@ func TestFormResource_ReadRemovesStateWhen404(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprintln(w, `{"success": true}`)
 	})
+	mux.HandleFunc("PUT /api/forms/enabled", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `{"success": true}`)
+	})
 	mux.HandleFunc("GET /api/forms/42", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		callCount++
