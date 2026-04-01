@@ -79,7 +79,7 @@ func (d *LicenseDataSource) Read(ctx context.Context, req datasource.ReadRequest
 
 	var matchedLicense *remsclient.License
 	for _, license := range licenseResult {
-		if enLocalizations, ok := license.Localizations["en"]; ok {
+		if enLocalizations, ok := license.Localizations[d.language]; ok {
 
 			if enLocalizations.Title == data.Title.ValueString() {
 				if matchedLicense != nil {

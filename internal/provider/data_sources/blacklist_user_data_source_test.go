@@ -82,7 +82,7 @@ provider "remscontent" {}
 data "remscontent_blacklist_user" "test" {
   email = "alice@example.com"
 }`,
-				ExpectError: regexp.MustCompile(`Error fetching user  available for blacklist`),
+				ExpectError: regexp.MustCompile(`Error fetching user available for blacklist`),
 			},
 		},
 	})

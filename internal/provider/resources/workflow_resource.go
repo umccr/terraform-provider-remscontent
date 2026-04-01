@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -24,6 +25,7 @@ import (
 // Ensure provider defined types fully satisfy framework interfaces.
 var _ resource.Resource = &WorkflowResource{}
 var _ resource.ResourceWithImportState = &WorkflowResource{}
+var _ resource.ResourceWithConfigure = &WorkflowResource{}
 
 func NewWorkflowResource() resource.Resource {
 	return &WorkflowResource{}
@@ -94,6 +96,9 @@ func (r *WorkflowResource) Schema(ctx context.Context, req resource.SchemaReques
 						"workflow/decider",
 					),
 				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"licenses": schema.ListAttribute{
 				Optional:            true,
@@ -129,17 +134,17 @@ func (r *WorkflowResource) Schema(ctx context.Context, req resource.SchemaReques
 					Attributes: map[string]schema.Attribute{
 						"command": schema.StringAttribute{
 							Required:            true,
-							MarkdownDescription: "The application command to disable (e.g. `accept‑licenses`).",
+							MarkdownDescription: "The command names listed in the [REMS application permissions docs](https://github.com/CSCfi/rems/blob/master/docs/application-permissions.md) with the `application.command/` prefix (e.g. `application.command/accept-licenses`).",
 						},
 						"when_role": schema.ListAttribute{
 							Optional:            true,
 							ElementType:         types.StringType,
-							MarkdownDescription: "Roles for which this command is disabled.",
+							MarkdownDescription: "Roles for which this command is disabled. Values must match the role strings defined in the [REMS application permissions docs](https://github.com/CSCfi/rems/blob/master/docs/application-permissions.md).",
 						},
 						"when_state": schema.ListAttribute{
 							Optional:            true,
 							ElementType:         types.StringType,
-							MarkdownDescription: "Application states in which this command is disabled.",
+							MarkdownDescription: "Application states in which this command is disabled. Values must match the state strings defined in the [REMS application permissions docs](https://github.com/CSCfi/rems/blob/master/docs/application-permissions.md).",
 						},
 					},
 				},
@@ -314,6 +319,15 @@ func (r *WorkflowResource) Read(ctx context.Context, req resource.ReadRequest, r
 		Forms []struct {
 			FormID int64 `json:"form/id"`
 		} `json:"forms"`
+		DisableCommands []struct {
+			Command   string   `json:"command"`
+			WhenRole  []string `json:"when/role"`
+			WhenState []string `json:"when/state"`
+		} `json:"disable-commands"`
+		ProcessingStates []struct {
+			Title map[string]string `json:"processing-state/title"`
+			Value string            `json:"processing-state/value"`
+		} `json:"processing-states"`
 	}
 	wfBodyBytes, err := json.Marshal(wfItem.Workflow)
 	if err != nil {
@@ -360,6 +374,41 @@ func (r *WorkflowResource) Read(ctx context.Context, req resource.ReadRequest, r
 			licenses[i] = l.LicenseID
 		}
 		state.Licenses = &licenses
+	}
+
+	// DisableCommands
+	state.DisableCommands = nil
+	if len(wfBody.DisableCommands) > 0 {
+		cmds := make([]DisableCommandModel, len(wfBody.DisableCommands))
+		for i, dc := range wfBody.DisableCommands {
+			whenRole := dc.WhenRole
+			if whenRole == nil {
+				whenRole = []string{}
+			}
+			whenState := dc.WhenState
+			if whenState == nil {
+				whenState = []string{}
+			}
+			cmds[i] = DisableCommandModel{
+				Command:   types.StringValue(dc.Command),
+				WhenRole:  whenRole,
+				WhenState: whenState,
+			}
+		}
+		state.DisableCommands = &cmds
+	}
+
+	// ProcessingStates
+	state.ProcessingStates = nil
+	if len(wfBody.ProcessingStates) > 0 {
+		pstates := make([]ProcessingStateModel, len(wfBody.ProcessingStates))
+		for i, ps := range wfBody.ProcessingStates {
+			pstates[i] = ProcessingStateModel{
+				Value: types.StringValue(ps.Value),
+				Title: types.StringValue(ps.Title[r.language]),
+			}
+		}
+		state.ProcessingStates = &pstates
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
@@ -421,11 +470,11 @@ func (r *WorkflowResource) Update(ctx context.Context, req resource.UpdateReques
 
 	wfEnabledResponse, wfEnabledErr := r.client.PutAPIWorkflowsEnabledWithResponse(ctx, nil, remsclient.EnabledCommand{ID: plan.Id.ValueInt64(), Enabled: plan.Enabled.ValueBool()})
 	if wfEnabledErr != nil {
-		resp.Diagnostics.AddError("Error Enabled/Disabled Workflow", wfEnabledErr.Error())
+		resp.Diagnostics.AddError("Error Enabling/Disabling Workflow", wfEnabledErr.Error())
 		return
 	}
 	if wfEnabledResponse.JSON200 == nil || !wfEnabledResponse.JSON200.Success {
-		resp.Diagnostics.AddError("Error Enabled/Disabled Workflow", fmt.Sprintf("status: %d, body: %s", wfEnabledResponse.StatusCode(), string(wfEnabledResponse.Body)))
+		resp.Diagnostics.AddError("Error Enabling/Disabling Workflow", fmt.Sprintf("status: %d, body: %s", wfEnabledResponse.StatusCode(), string(wfEnabledResponse.Body)))
 		return
 	}
 

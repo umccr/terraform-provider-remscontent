@@ -140,14 +140,13 @@ func (r *BlacklistResource) Read(ctx context.Context, req resource.ReadRequest, 
 
 	// it shouldn't return more than 1
 	if len(*readResp.JSON200) != 1 {
-		resp.Diagnostics.AddError("Unexpected blacklist", "Error contain more than 1 blacklist ")
+		resp.Diagnostics.AddError("Unexpected blacklist", "Error contain more than 1 blacklist")
 		return
 	}
 
 	blacklistResource := (*readResp.JSON200)[0]
 	state.Comment = types.StringValue(blacklistResource.BlacklistComment)
 
-	// The comment is not returned by the GET, so preserve whatever is in state.
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 

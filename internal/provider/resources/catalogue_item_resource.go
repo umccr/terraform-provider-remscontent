@@ -152,7 +152,7 @@ func (r *CatalogueItemResource) Create(ctx context.Context, req resource.CreateR
 		Resid: plan.ResourceId.ValueInt64(),
 		Wfid:  plan.WorkflowId.ValueInt64(),
 		Localizations: remsclient.WriteCatalogueItemLocalizations{
-			"en": remsclient.CatalogueItemLocalization{
+			r.language: remsclient.CatalogueItemLocalization{
 				Infourl: plan.Localizations.Infourl.ValueStringPointer(),
 				Title:   plan.Localizations.Title.ValueString(),
 			},
@@ -253,7 +253,7 @@ func (r *CatalogueItemResource) Update(ctx context.Context, req resource.UpdateR
 			OrganizationID: plan.OrganizationId.ValueString(),
 		},
 		Localizations: remsclient.WriteCatalogueItemLocalizations{
-			"en": remsclient.CatalogueItemLocalization{
+			r.language: remsclient.CatalogueItemLocalization{
 				Infourl: plan.Localizations.Infourl.ValueStringPointer(),
 				Title:   plan.Localizations.Title.ValueString(),
 			},

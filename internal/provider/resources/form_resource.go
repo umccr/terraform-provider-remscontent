@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strconv"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -24,6 +25,7 @@ import (
 var _ resource.Resource = &FormResource{}
 var _ resource.ResourceWithImportState = &FormResource{}
 var _ resource.ResourceWithConfigure = &FormResource{}
+var _ resource.ResourceWithModifyPlan = &FormResource{}
 
 func NewFormResource() resource.Resource {
 	return &FormResource{}
@@ -422,7 +424,7 @@ func (r *FormResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 		return
 	}
 
-	tflog.Info(ctx, fmt.Sprintf("Archived license with ID: %d", state.Id.ValueInt64()))
+	tflog.Info(ctx, fmt.Sprintf("Archived form with ID: %d", state.Id.ValueInt64()))
 
 }
 
@@ -582,6 +584,49 @@ func (r *FormResource) ValidateConfig(ctx context.Context, req resource.Validate
 		}
 	}
 
+}
+
+func (r *FormResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.Plan.Raw.IsNull() {
+		// If the entire plan is null, the resource is planned for destruction.
+		return
+	}
+
+	// New resource — no existing form to check.
+	if req.State.Raw.IsNull() {
+		return
+	}
+
+	var state FormResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	var plan FormResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Only call the editability API when fields that require it have changed.
+	if state.OrganizationId.Equal(plan.OrganizationId) &&
+		state.InternalName.Equal(plan.InternalName) &&
+		state.ExternalTitle.Equal(plan.ExternalTitle) &&
+		reflect.DeepEqual(state.Fields, plan.Fields) {
+		return
+	}
+
+	formID := state.Id.ValueInt64()
+	isEditable, err := r.client.GetAPIFormsFormIDEditableWithResponse(ctx, formID, nil)
+	if err != nil || isEditable.JSON200 == nil || !isEditable.JSON200.Success {
+		resp.RequiresReplace.Append(
+			path.Root("organization_id"),
+			path.Root("internal_name"),
+			path.Root("external_title"),
+			path.Root("fields"),
+		)
+	}
 }
 
 // Helper function.
