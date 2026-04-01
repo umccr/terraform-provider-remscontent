@@ -200,24 +200,61 @@ func (r *LicenseResource) Create(ctx context.Context, req resource.CreateRequest
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Creating License",
-			fmt.Sprintf("Unable to create license: %s", err),
+			err.Error(),
 		)
 		return
 	}
 
-	if licenseResult.JSON200.ID == nil {
-		resp.Diagnostics.AddError(
-			"Error Creating License",
-			"API returned a nil ID for the created license.",
-		)
-		return
-	}
-	if licenseResult.StatusCode() != 200 || licenseResult.JSON200 == nil || licenseResult.JSON200.ID == nil {
+	if licenseResult.JSON200 == nil || licenseResult.JSON200.ID == nil {
 		resp.Diagnostics.AddError("Error Creating License", fmt.Sprintf("status: %d, body: %s", licenseResult.StatusCode(), string(licenseResult.Body)))
 		return
 	}
-
 	plan.Id = types.Int64Value(*licenseResult.JSON200.ID)
+
+	licenseArchiveCommand := remsclient.ArchivedCommand{
+		ID:       plan.Id.ValueInt64(),
+		Archived: plan.Archived.ValueBool(),
+	}
+
+	archivedResponse, archiveErr := r.client.PutAPILicensesArchivedWithResponse(ctx, nil, licenseArchiveCommand)
+	if archiveErr != nil {
+		resp.Diagnostics.AddError(
+			"Error Archiving/Unarchiving License",
+			archiveErr.Error(),
+		)
+		return
+	}
+
+	if archivedResponse.JSON200 == nil || !archivedResponse.JSON200.Success {
+		resp.Diagnostics.AddError(
+			"Error Archiving/Unarchiving License",
+			fmt.Sprintf("Unable to archive/unarchive license id: %d", plan.Id.ValueInt64()),
+		)
+		return
+	}
+
+	// disabled api request
+	licenseEnabledCommand := remsclient.EnabledCommand{
+		ID:      plan.Id.ValueInt64(),
+		Enabled: plan.Enabled.ValueBool(),
+	}
+
+	enabledResponse, enabledErr := r.client.PutAPILicensesEnabledWithResponse(ctx, nil, licenseEnabledCommand)
+	if enabledErr != nil {
+		resp.Diagnostics.AddError(
+			"Error Enabled/Disabled License",
+			enabledErr.Error(),
+		)
+		return
+	}
+	if enabledResponse.JSON200 == nil || !enabledResponse.JSON200.Success {
+		resp.Diagnostics.AddError(
+			"Error Enabled/Disabled License",
+			fmt.Sprintf("Unable to enabled/disabled license id: %d", plan.Id.ValueInt64()),
+		)
+		return
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -270,86 +307,48 @@ func (r *LicenseResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	licenseResponse, err := r.client.GetAPILicensesLicenseIDWithResponse(ctx, plan.Id.ValueInt64(), nil)
-	if err != nil {
+	licenseArchiveCommand := remsclient.ArchivedCommand{
+		ID:       plan.Id.ValueInt64(),
+		Archived: plan.Archived.ValueBool(),
+	}
+
+	archivedResponse, archiveErr := r.client.PutAPILicensesArchivedWithResponse(ctx, nil, licenseArchiveCommand)
+	if archiveErr != nil {
 		resp.Diagnostics.AddError(
-			"Error Reading License",
-			fmt.Sprintf("Unable to read license %d: %s", plan.Id.ValueInt64(), err),
+			"Error Archiving/Unarchiving License",
+			archiveErr.Error(),
 		)
 		return
 	}
 
-	licenseResult := licenseResponse.JSON200
-
-	// archiving api requests
-	if licenseResult.Archived != plan.Archived.ValueBool() {
-		licenseArchiveCommand := remsclient.ArchivedCommand{
-			ID:       plan.Id.ValueInt64(),
-			Archived: plan.Archived.ValueBool(),
-		}
-
-		archivedResponse, archiveErr := r.client.PutAPILicensesArchivedWithResponse(ctx, nil, licenseArchiveCommand)
-		if archiveErr != nil || archivedResponse == nil || archivedResponse.JSON200 == nil {
-			resp.Diagnostics.AddError(
-				"Error Archiving/Unarchiving License",
-				fmt.Sprintf("Unable to archive/unarchive license id: %d", plan.Id.ValueInt64()),
-			)
-			return
-		}
-
-		if !archivedResponse.JSON200.Success {
-			resp.Diagnostics.AddError(
-				"Error Archiving/Unarchiving License",
-				fmt.Sprintf("Unable to archive/unarchive license id: %d", plan.Id.ValueInt64()),
-			)
-			return
-		}
-	}
-
-	// disabled api request
-	if licenseResult.Enabled != plan.Enabled.ValueBool() {
-		licenseEnabledCommand := remsclient.EnabledCommand{
-			ID:      plan.Id.ValueInt64(),
-			Enabled: plan.Enabled.ValueBool(),
-		}
-
-		enabledResponse, enabledErr := r.client.PutAPILicensesEnabledWithResponse(ctx, nil, licenseEnabledCommand)
-		if enabledErr != nil || enabledResponse == nil || enabledResponse.JSON200 == nil {
-			resp.Diagnostics.AddError(
-				"Error Enabled/Disabled License",
-				fmt.Sprintf("Unable to enabled/disabled license id: %d", plan.Id.ValueInt64()),
-			)
-			return
-		}
-		if !enabledResponse.JSON200.Success {
-			resp.Diagnostics.AddError(
-				"Error Enabled/Disabled License",
-				fmt.Sprintf("Unable to enabled/disabled license id: %d", plan.Id.ValueInt64()),
-			)
-			return
-		}
-
-	}
-
-	licenseResponse, err = r.client.GetAPILicensesLicenseIDWithResponse(ctx, plan.Id.ValueInt64(), nil)
-	if err != nil {
+	if archivedResponse.JSON200 == nil || !archivedResponse.JSON200.Success {
 		resp.Diagnostics.AddError(
-			"Error Reading License",
-			fmt.Sprintf("Unable to read license %d: %s", plan.Id.ValueInt64(), err),
+			"Error Archiving/Unarchiving License",
+			fmt.Sprintf("Unable to archive/unarchive license id: %d", plan.Id.ValueInt64()),
 		)
 		return
 	}
-	if licenseResponse.StatusCode() != 200 || licenseResponse.JSON200 == nil {
+
+	licenseEnabledCommand := remsclient.EnabledCommand{
+		ID:      plan.Id.ValueInt64(),
+		Enabled: plan.Enabled.ValueBool(),
+	}
+
+	enabledResponse, enabledErr := r.client.PutAPILicensesEnabledWithResponse(ctx, nil, licenseEnabledCommand)
+	if enabledErr != nil {
 		resp.Diagnostics.AddError(
-			"Error Reading License",
-			fmt.Sprintf("status: %d, body: %s", licenseResponse.StatusCode(), string(licenseResponse.Body)),
+			"Error Enabled/Disabled License",
+			fmt.Sprintf("Unable to enabled/disabled license id: %d", plan.Id.ValueInt64()),
 		)
 		return
 	}
-	licenseResult = licenseResponse.JSON200
-
-	plan.Archived = types.BoolValue(licenseResult.Archived)
-	plan.Enabled = types.BoolValue(licenseResult.Enabled)
+	if enabledResponse.JSON200 == nil || !enabledResponse.JSON200.Success {
+		resp.Diagnostics.AddError(
+			"Error Enabled/Disabled License",
+			fmt.Sprintf("Unable to enabled/disabled license id: %d", plan.Id.ValueInt64()),
+		)
+		return
+	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -371,7 +370,7 @@ func (r *LicenseResource) Delete(ctx context.Context, req resource.DeleteRequest
 	if err != nil || archivedResponse == nil || archivedResponse.JSON200 == nil {
 		resp.Diagnostics.AddError(
 			"Error Archiving License",
-			fmt.Sprintf("Unable to archive license id: %d", state.Id.ValueInt64()),
+			err.Error(),
 		)
 		return
 	}
@@ -394,7 +393,7 @@ func (r *LicenseResource) ImportState(ctx context.Context, req resource.ImportSt
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Invalid Import ID",
-			fmt.Sprintf("Unable to convert import ID to integer: %s", err),
+			err.Error(),
 		)
 		return
 	}

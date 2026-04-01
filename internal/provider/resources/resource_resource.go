@@ -121,7 +121,7 @@ func (r *ResourceResource) Create(ctx context.Context, req resource.CreateReques
 		resp.Diagnostics.AddError("Error Creating Resource", createErr.Error())
 		return
 	}
-	if createResp.StatusCode() != 200 || createResp.JSON200 == nil {
+	if createResp.JSON200 == nil || !createResp.JSON200.Success {
 		resp.Diagnostics.AddError("Error Creating Resource", fmt.Sprintf("status: %d, body: %s", createResp.StatusCode(), string(createResp.Body)))
 		return
 	}
@@ -136,7 +136,7 @@ func (r *ResourceResource) Create(ctx context.Context, req resource.CreateReques
 		resp.Diagnostics.AddError("Error Setting Resource Enabled State", enabledErr.Error())
 		return
 	}
-	if enabledResp.StatusCode() != 200 || enabledResp.JSON200 == nil {
+	if enabledResp.JSON200 == nil || !enabledResp.JSON200.Success {
 		resp.Diagnostics.AddError("Error Setting Resource Enabled State", fmt.Sprintf("status: %d, body: %s", enabledResp.StatusCode(), string(enabledResp.Body)))
 		return
 	}
@@ -146,7 +146,7 @@ func (r *ResourceResource) Create(ctx context.Context, req resource.CreateReques
 		resp.Diagnostics.AddError("Error Setting Resource Archived State", archivedErr.Error())
 		return
 	}
-	if archivedResp.StatusCode() != 200 || archivedResp.JSON200 == nil {
+	if archivedResp.JSON200 == nil || !archivedResp.JSON200.Success {
 		resp.Diagnostics.AddError("Error Setting Resource Archived State", fmt.Sprintf("status: %d, body: %s", archivedResp.StatusCode(), string(archivedResp.Body)))
 		return
 	}
@@ -206,7 +206,7 @@ func (r *ResourceResource) Update(ctx context.Context, req resource.UpdateReques
 		resp.Diagnostics.AddError("Error Setting Resource Enabled State", enabledErr.Error())
 		return
 	}
-	if enabledResp.StatusCode() != 200 || enabledResp.JSON200 == nil {
+	if enabledResp.JSON200 == nil || !enabledResp.JSON200.Success {
 		resp.Diagnostics.AddError("Error Setting Resource Enabled State", fmt.Sprintf("status: %d, body: %s", enabledResp.StatusCode(), string(enabledResp.Body)))
 		return
 	}
@@ -216,7 +216,7 @@ func (r *ResourceResource) Update(ctx context.Context, req resource.UpdateReques
 		resp.Diagnostics.AddError("Error Setting Resource Archived State", archivedErr.Error())
 		return
 	}
-	if archivedResp.StatusCode() != 200 || archivedResp.JSON200 == nil {
+	if archivedResp.JSON200 == nil || !archivedResp.JSON200.Success {
 		resp.Diagnostics.AddError("Error Setting Resource Archived State", fmt.Sprintf("status: %d, body: %s", archivedResp.StatusCode(), string(archivedResp.Body)))
 		return
 	}
@@ -236,7 +236,7 @@ func (r *ResourceResource) Delete(ctx context.Context, req resource.DeleteReques
 		resp.Diagnostics.AddError("Error Archiving Resource", archivedErr.Error())
 		return
 	}
-	if archivedResp.StatusCode() != 200 || archivedResp.JSON200 == nil {
+	if archivedResp.JSON200 == nil || !archivedResp.JSON200.Success {
 		resp.Diagnostics.AddError("Error Archiving Resource", fmt.Sprintf("status: %d, body: %s", archivedResp.StatusCode(), string(archivedResp.Body)))
 		return
 	}

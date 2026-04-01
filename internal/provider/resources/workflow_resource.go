@@ -245,7 +245,7 @@ func (r *WorkflowResource) Create(ctx context.Context, req resource.CreateReques
 		resp.Diagnostics.AddError("Error Creating Workflow", workflowCreateErr.Error())
 		return
 	}
-	if workflowCreateResponse.StatusCode() != 200 || workflowCreateResponse.JSON200 == nil {
+	if workflowCreateResponse.JSON200 == nil || workflowCreateResponse.JSON200.ID == nil || !workflowCreateResponse.JSON200.Success {
 		resp.Diagnostics.AddError("Error Creating Workflow", fmt.Sprintf("status: %d, body: %s", workflowCreateResponse.StatusCode(), string(workflowCreateResponse.Body)))
 		return
 	}
@@ -256,7 +256,7 @@ func (r *WorkflowResource) Create(ctx context.Context, req resource.CreateReques
 		resp.Diagnostics.AddError("Error Enabled/Disabled Workflow", wfEnabledErr.Error())
 		return
 	}
-	if wfEnabledResponse.StatusCode() != 200 || wfEnabledResponse.JSON200 == nil {
+	if wfEnabledResponse.JSON200 == nil || !wfEnabledResponse.JSON200.Success {
 		resp.Diagnostics.AddError("Error Enabled/Disabled Workflow", fmt.Sprintf("status: %d, body: %s", wfEnabledResponse.StatusCode(), string(wfEnabledResponse.Body)))
 		return
 	}
@@ -266,7 +266,7 @@ func (r *WorkflowResource) Create(ctx context.Context, req resource.CreateReques
 		resp.Diagnostics.AddError("Error Archiving/Unarchiving Workflow", wfArchivedErr.Error())
 		return
 	}
-	if wfArchivedResponse.StatusCode() != 200 || wfArchivedResponse.JSON200 == nil {
+	if wfArchivedResponse.JSON200 == nil || !wfArchivedResponse.JSON200.Success {
 		resp.Diagnostics.AddError("Error Archiving/Unarchiving Workflow", fmt.Sprintf("status: %d, body: %s", wfArchivedResponse.StatusCode(), string(wfArchivedResponse.Body)))
 		return
 	}
@@ -372,26 +372,6 @@ func (r *WorkflowResource) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
-	wfEnabledResponse, wfEnabledErr := r.client.PutAPIWorkflowsEnabledWithResponse(ctx, nil, remsclient.EnabledCommand{ID: plan.Id.ValueInt64(), Enabled: plan.Enabled.ValueBool()})
-	if wfEnabledErr != nil {
-		resp.Diagnostics.AddError("Error Enabled/Disabled Workflow", wfEnabledErr.Error())
-		return
-	}
-	if wfEnabledResponse.StatusCode() != 200 || wfEnabledResponse.JSON200 == nil {
-		resp.Diagnostics.AddError("Error Enabled/Disabled Workflow", fmt.Sprintf("status: %d, body: %s", wfEnabledResponse.StatusCode(), string(wfEnabledResponse.Body)))
-		return
-	}
-
-	wfArchivedResponse, wfArchivedErr := r.client.PutAPIWorkflowsArchivedWithResponse(ctx, nil, remsclient.ArchivedCommand{ID: plan.Id.ValueInt64(), Archived: plan.Archived.ValueBool()})
-	if wfArchivedErr != nil {
-		resp.Diagnostics.AddError("Error Archiving/Unarchiving Workflow", wfArchivedErr.Error())
-		return
-	}
-	if wfArchivedResponse.StatusCode() != 200 || wfArchivedResponse.JSON200 == nil {
-		resp.Diagnostics.AddError("Error Archiving/Unarchiving Workflow", fmt.Sprintf("status: %d, body: %s", wfArchivedResponse.StatusCode(), string(wfArchivedResponse.Body)))
-		return
-	}
-
 	var disableCommandsCmd *[]remsclient.DisableCommandRule
 	if plan.DisableCommands != nil {
 		s := make([]remsclient.DisableCommandRule, len(*plan.DisableCommands))
@@ -429,13 +409,33 @@ func (r *WorkflowResource) Update(ctx context.Context, req resource.UpdateReques
 		Title:            plan.Title.ValueStringPointer(),
 	}
 
-	workflowEditResponse, workflowCreateErr := r.client.PutAPIWorkflowsEditWithResponse(ctx, nil, workflowEditResourceCommand)
-	if workflowCreateErr != nil {
-		resp.Diagnostics.AddError("Error Enabled/Disabled Workflow", workflowCreateErr.Error())
+	workflowEditResponse, workflowEditErr := r.client.PutAPIWorkflowsEditWithResponse(ctx, nil, workflowEditResourceCommand)
+	if workflowEditErr != nil {
+		resp.Diagnostics.AddError("Error Updating Workflow", workflowEditErr.Error())
 		return
 	}
-	if workflowEditResponse.StatusCode() != 200 || workflowEditResponse.JSON200 == nil {
-		resp.Diagnostics.AddError("Error Enabled/Disabled Workflow", fmt.Sprintf("status: %d, body: %s", workflowEditResponse.StatusCode(), string(workflowEditResponse.Body)))
+	if workflowEditResponse.JSON200 == nil || !workflowEditResponse.JSON200.Success {
+		resp.Diagnostics.AddError("Error Updating Workflow", fmt.Sprintf("status: %d, body: %s", workflowEditResponse.StatusCode(), string(workflowEditResponse.Body)))
+		return
+	}
+
+	wfEnabledResponse, wfEnabledErr := r.client.PutAPIWorkflowsEnabledWithResponse(ctx, nil, remsclient.EnabledCommand{ID: plan.Id.ValueInt64(), Enabled: plan.Enabled.ValueBool()})
+	if wfEnabledErr != nil {
+		resp.Diagnostics.AddError("Error Enabled/Disabled Workflow", wfEnabledErr.Error())
+		return
+	}
+	if wfEnabledResponse.JSON200 == nil || !wfEnabledResponse.JSON200.Success {
+		resp.Diagnostics.AddError("Error Enabled/Disabled Workflow", fmt.Sprintf("status: %d, body: %s", wfEnabledResponse.StatusCode(), string(wfEnabledResponse.Body)))
+		return
+	}
+
+	wfArchivedResponse, wfArchivedErr := r.client.PutAPIWorkflowsArchivedWithResponse(ctx, nil, remsclient.ArchivedCommand{ID: plan.Id.ValueInt64(), Archived: plan.Archived.ValueBool()})
+	if wfArchivedErr != nil {
+		resp.Diagnostics.AddError("Error Archiving/Unarchiving Workflow", wfArchivedErr.Error())
+		return
+	}
+	if wfArchivedResponse.JSON200 == nil || !wfArchivedResponse.JSON200.Success {
+		resp.Diagnostics.AddError("Error Archiving/Unarchiving Workflow", fmt.Sprintf("status: %d, body: %s", wfArchivedResponse.StatusCode(), string(wfArchivedResponse.Body)))
 		return
 	}
 
@@ -451,14 +451,15 @@ func (r *WorkflowResource) Delete(ctx context.Context, req resource.DeleteReques
 
 	wfArchivedResponse, wfArchivedErr := r.client.PutAPIWorkflowsArchivedWithResponse(ctx, nil, remsclient.ArchivedCommand{ID: state.Id.ValueInt64(), Archived: true})
 	if wfArchivedErr != nil {
-		resp.Diagnostics.AddError("Error Archiving/Unarchiving Workflow", wfArchivedErr.Error())
+		resp.Diagnostics.AddError("Error Archiving Workflow", wfArchivedErr.Error())
 		return
 	}
-	if wfArchivedResponse.StatusCode() != 200 || wfArchivedResponse.JSON200 == nil {
-		resp.Diagnostics.AddError("Error Archiving/Unarchiving Workflow", fmt.Sprintf("status: %d, body: %s", wfArchivedResponse.StatusCode(), string(wfArchivedResponse.Body)))
+	if wfArchivedResponse.JSON200 == nil || !wfArchivedResponse.JSON200.Success {
+		resp.Diagnostics.AddError("Error Archiving Workflow", fmt.Sprintf("status: %d, body: %s", wfArchivedResponse.StatusCode(), string(wfArchivedResponse.Body)))
 		return
 	}
 
+	tflog.Info(ctx, fmt.Sprintf("Archived workflow with ID: %d", state.Id.ValueInt64()))
 }
 
 func (r *WorkflowResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
