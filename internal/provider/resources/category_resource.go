@@ -228,6 +228,7 @@ func (r *CategoryResource) Delete(ctx context.Context, req resource.DeleteReques
 		resp.Diagnostics.AddError("Error Removing Category Entry", fmt.Sprintf("status: %d, body: %s", removeResp.StatusCode(), string(removeResp.Body)))
 		return
 	}
+	tflog.Info(ctx, fmt.Sprintf("Delete categories with ID: %d", state.Id.ValueInt64()))
 
 }
 

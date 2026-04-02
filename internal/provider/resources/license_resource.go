@@ -31,6 +31,7 @@ import (
 var _ resource.Resource = &LicenseResource{}
 var _ resource.ResourceWithImportState = &LicenseResource{}
 var _ resource.ResourceWithValidateConfig = &LicenseResource{}
+var _ resource.ResourceWithConfigure = &LicenseResource{}
 
 func NewLicenseResource() resource.Resource {
 	return &LicenseResource{}
@@ -161,7 +162,7 @@ func (r *LicenseResource) Create(ctx context.Context, req resource.CreateRequest
 			OrganizationID: plan.OrganizationId.ValueString(),
 		},
 		Localizations: map[string]remsclient.LicenseLocalization{
-			"en": {
+			r.language: {
 				Title:       plan.Title.ValueString(),
 				Textcontent: plan.Content.ValueString(),
 			},
@@ -181,10 +182,10 @@ func (r *LicenseResource) Create(ctx context.Context, req resource.CreateRequest
 			return
 		}
 
-		enLoc := licenseCommand.Localizations["en"]
+		enLoc := licenseCommand.Localizations[r.language]
 		enLoc.AttachmentID = &attachment_id
 		enLoc.Textcontent = filepath.Base(filePath)
-		licenseCommand.Localizations["en"] = enLoc
+		licenseCommand.Localizations[r.language] = enLoc
 
 		// Ensure content is null because
 		plan.Content = types.StringNull()
@@ -287,7 +288,7 @@ func (r *LicenseResource) Read(ctx context.Context, req resource.ReadRequest, re
 	state.Archived = types.BoolValue(licenseResult.Archived)
 	state.Enabled = types.BoolValue(licenseResult.Enabled)
 
-	enLoc := licenseResult.Localizations["en"]
+	enLoc := licenseResult.Localizations[r.language]
 	state.Title = types.StringValue(enLoc.Title)
 	state.Content = types.StringValue(enLoc.Textcontent)
 
@@ -338,7 +339,7 @@ func (r *LicenseResource) Update(ctx context.Context, req resource.UpdateRequest
 	if enabledErr != nil {
 		resp.Diagnostics.AddError(
 			"Error Enabled/Disabled License",
-			fmt.Sprintf("Unable to enabled/disabled license id: %d", plan.Id.ValueInt64()),
+			enabledErr.Error(),
 		)
 		return
 	}
@@ -367,19 +368,15 @@ func (r *LicenseResource) Delete(ctx context.Context, req resource.DeleteRequest
 		Archived: true,
 	}
 	archivedResponse, err := r.client.PutAPILicensesArchivedWithResponse(ctx, nil, licenseArchiveCommand)
-	if err != nil || archivedResponse == nil || archivedResponse.JSON200 == nil {
+	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Archiving License",
 			err.Error(),
 		)
 		return
 	}
-
-	if !archivedResponse.JSON200.Success {
-		resp.Diagnostics.AddError(
-			"Error Archiving License",
-			fmt.Sprintf("Unable to archive license id: %d", state.Id.ValueInt64()),
-		)
+	if archivedResponse.JSON200 == nil || !archivedResponse.JSON200.Success {
+		resp.Diagnostics.AddError("Error Archiving License", fmt.Sprintf("status: %d, body: %s", archivedResponse.StatusCode(), string(archivedResponse.Body)))
 		return
 	}
 

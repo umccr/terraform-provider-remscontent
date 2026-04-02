@@ -65,7 +65,7 @@ func (d *BlacklistUserDataSource) Read(ctx context.Context, req datasource.ReadR
 		return
 	}
 	if usersResponse.StatusCode() != 200 || usersResponse.JSON200 == nil {
-		resp.Diagnostics.AddError("Error fetching user  available for blacklist", fmt.Sprintf("status: %d, body: %s", usersResponse.StatusCode(), string(usersResponse.Body)))
+		resp.Diagnostics.AddError("Error fetching user available for blacklist", fmt.Sprintf("status: %d, body: %s", usersResponse.StatusCode(), string(usersResponse.Body)))
 		return
 	}
 

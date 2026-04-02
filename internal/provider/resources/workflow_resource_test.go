@@ -423,3 +423,163 @@ resource "remscontent_workflow" "test" {
 		},
 	})
 }
+
+func TestWorkflowResource_DisableCommandsAndProcessingStates(t *testing.T) {
+	readJSON := `{
+  "id": 42,
+  "title": "Advanced Workflow",
+  "organization": {
+    "organization/id": "test-org",
+    "organization/name": {},
+    "organization/short-name": {}
+  },
+  "enabled": true,
+  "archived": false,
+  "workflow": {
+    "type": "workflow/default",
+    "anonymize-handling": false,
+    "handlers": [],
+    "forms": [],
+    "licenses": [],
+    "disable-commands": [
+      {
+        "command": "application.command/accept-invitation",
+        "when/state": ["application.state/draft", "application.state/submitted"],
+        "when/role": ["member", "decider"]
+      }
+    ],
+    "processing-states": [
+      {
+        "processing-state/value": "in voting",
+        "processing-state/title": {"en": "In voting"}
+      },
+      {
+        "processing-state/value": "preliminarily approved",
+        "processing-state/title": {"en": "Preliminarily approved"}
+      }
+    ]
+  }
+}`
+
+	factories, cleanup := testProviderWithMockServer(t, mockWorkflowHandler(readJSON))
+	defer cleanup()
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories,
+		Steps: []resource.TestStep{
+			{
+				Config: `
+provider "remscontent" {}
+
+resource "remscontent_workflow" "test" {
+  title           = "Advanced Workflow"
+  organization_id = "test-org"
+  type            = "workflow/default"
+
+  disable_commands = [
+    {
+      command    = "application.command/accept-invitation"
+      when_state = ["application.state/draft", "application.state/submitted"]
+      when_role  = ["member", "decider"]
+    }
+  ]
+
+  processing_states = [
+    {
+      value = "in voting"
+      title = "In voting"
+    },
+    {
+      value = "preliminarily approved"
+      title = "Preliminarily approved"
+    }
+  ]
+}`,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("remscontent_workflow.test", "id", "42"),
+
+					// disable_commands
+					resource.TestCheckResourceAttr("remscontent_workflow.test", "disable_commands.#", "1"),
+					resource.TestCheckResourceAttr("remscontent_workflow.test", "disable_commands.0.command", "application.command/accept-invitation"),
+					resource.TestCheckResourceAttr("remscontent_workflow.test", "disable_commands.0.when_state.#", "2"),
+					resource.TestCheckResourceAttr("remscontent_workflow.test", "disable_commands.0.when_state.0", "application.state/draft"),
+					resource.TestCheckResourceAttr("remscontent_workflow.test", "disable_commands.0.when_state.1", "application.state/submitted"),
+					resource.TestCheckResourceAttr("remscontent_workflow.test", "disable_commands.0.when_role.#", "2"),
+					resource.TestCheckResourceAttr("remscontent_workflow.test", "disable_commands.0.when_role.0", "member"),
+					resource.TestCheckResourceAttr("remscontent_workflow.test", "disable_commands.0.when_role.1", "decider"),
+
+					// processing_states
+					resource.TestCheckResourceAttr("remscontent_workflow.test", "processing_states.#", "2"),
+					resource.TestCheckResourceAttr("remscontent_workflow.test", "processing_states.0.value", "in voting"),
+					resource.TestCheckResourceAttr("remscontent_workflow.test", "processing_states.0.title", "In voting"),
+					resource.TestCheckResourceAttr("remscontent_workflow.test", "processing_states.1.value", "preliminarily approved"),
+					resource.TestCheckResourceAttr("remscontent_workflow.test", "processing_states.1.title", "Preliminarily approved"),
+				),
+			},
+		},
+	})
+}
+
+func TestWorkflowResource_DisableCommandsEmptyRoleAndState(t *testing.T) {
+	// Verifies that a disable_commands entry with no when_role / when_state
+	// is handled without panic (nil slices are normalised to empty lists).
+	readJSON := `{
+  "id": 42,
+  "title": "Minimal Disable",
+  "organization": {
+    "organization/id": "test-org",
+    "organization/name": {},
+    "organization/short-name": {}
+  },
+  "enabled": true,
+  "archived": false,
+  "workflow": {
+    "type": "workflow/default",
+    "anonymize-handling": false,
+    "handlers": [],
+    "forms": [],
+    "licenses": [],
+    "disable-commands": [
+      {
+        "command": "application.command/close",
+        "when/state": [],
+        "when/role": []
+      }
+    ]
+  }
+}`
+
+	factories, cleanup := testProviderWithMockServer(t, mockWorkflowHandler(readJSON))
+	defer cleanup()
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: factories,
+		Steps: []resource.TestStep{
+			{
+				Config: `
+provider "remscontent" {}
+
+resource "remscontent_workflow" "test" {
+  title           = "Minimal Disable"
+  organization_id = "test-org"
+  type            = "workflow/default"
+
+  disable_commands = [
+    {
+      command    = "application.command/close"
+      when_state = []
+      when_role  = []
+    }
+  ]
+}`,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("remscontent_workflow.test", "disable_commands.#", "1"),
+					resource.TestCheckResourceAttr("remscontent_workflow.test", "disable_commands.0.command", "application.command/close"),
+					resource.TestCheckResourceAttr("remscontent_workflow.test", "disable_commands.0.when_role.#", "0"),
+					resource.TestCheckResourceAttr("remscontent_workflow.test", "disable_commands.0.when_state.#", "0"),
+					resource.TestCheckNoResourceAttr("remscontent_workflow.test", "processing_states"),
+				),
+			},
+		},
+	})
+}
