@@ -33,9 +33,6 @@ resource "remscontent_blacklist" "user1" {
 
 ### Required
 
+- `comment` (String) A comment explaining the reason for the blacklist entry.
 - `resource_ext_id` (String) The external resource ID (e.g. a URI) to blacklist the user from.
 - `user_id` (String) The REMS user ID to blacklist.
-
-### Optional
-
-- `comment` (String) A comment explaining the reason for the blacklist entry.

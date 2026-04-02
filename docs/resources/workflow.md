@@ -79,12 +79,12 @@ resource "remscontent_workflow" "example_1" {
 
 Required:
 
-- `command` (String) The application command to disable (e.g. `accept‑licenses`).
+- `command` (String) The command names listed in the [REMS application permissions docs](https://github.com/CSCfi/rems/blob/master/docs/application-permissions.md) with the `application.command/` prefix (e.g. `application.command/accept-licenses`).
 
 Optional:
 
-- `when_role` (List of String) Roles for which this command is disabled.
-- `when_state` (List of String) Application states in which this command is disabled.
+- `when_role` (List of String) Roles for which this command is disabled. Values must match the role strings defined in the [REMS application permissions docs](https://github.com/CSCfi/rems/blob/master/docs/application-permissions.md).
+- `when_state` (List of String) Application states in which this command is disabled. Values must match the state strings defined in the [REMS application permissions docs](https://github.com/CSCfi/rems/blob/master/docs/application-permissions.md).
 
 
 <a id="nestedatt--processing_states"></a>
