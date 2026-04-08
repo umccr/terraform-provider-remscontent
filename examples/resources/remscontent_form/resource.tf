@@ -15,19 +15,23 @@ resource "remscontent_form" "test_form" {
 
   fields = [
     {
+      "id" : "fld1"
       "title" : "Title",
       "type" : "text",
       "optional" : false
     },
     {
+      "id" : "fld2"
       "title" : "ph.number",
       "type" : "phone-number",
     },
     {
+      "id" : "fld3"
       "title" : "Email",
       "type" : "email"
     },
     {
+      "id" : "fld4"
       "title" : "Date",
       "type" : "date"
     },
@@ -47,6 +51,7 @@ resource "remscontent_form" "test_form" {
       ]
     },
     {
+      "id" : "fld6",
       "title" : "Attachment",
       "type" : "attachment",
       "visibility" : {
